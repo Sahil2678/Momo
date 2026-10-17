@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Image from "next/image";
 import { MomoItem, getWholesalePriceForItem } from "@/types/momo";
 import { useCart } from "@/context/CartContext";
-import { Plus, Check, Flame } from "lucide-react";
+import { Plus, Check } from "lucide-react";
 
 interface MomoCardProps {
   momo: MomoItem;
@@ -27,7 +27,7 @@ export function MomoCard({ momo }: MomoCardProps) {
     Medium: "bg-amber-500/10 text-amber-400 border-amber-500/20",
     Hot: "bg-orange-500/10 text-orange-400 border-orange-500/20",
     "Extra Fiery": "bg-rose-500/10 text-rose-400 border-rose-500/20",
-  }[momo.spiceLevel];
+  }[momo.spiceLevel || "Medium"];
 
   return (
     <div className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.07] to-white/[0.02] p-3.5 sm:p-5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-amber-500/40 hover:shadow-[0_20px_40px_-15px_rgba(245,158,11,0.15)] w-[82vw] max-w-[310px] shrink-0 snap-center sm:w-auto sm:max-w-none">
@@ -49,7 +49,11 @@ export function MomoCard({ momo }: MomoCardProps) {
               {momo.badge}
             </span>
           )}
-          
+          {momo.spiceLevel && (
+            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold border backdrop-blur-md ${spiceBadgeColor}`}>
+              {momo.spiceLevel}
+            </span>
+          )}
         </div>
 
         <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs text-zinc-300">

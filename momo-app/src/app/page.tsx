@@ -11,10 +11,6 @@ import { useCart } from "@/context/CartContext";
 import { MomoIcon } from '@/components/CustomIcon/MomoIcon';
 import {
   ShoppingBag,
-  Flame,
-  Clock,
-  ShieldCheck,
-  Award,
   Soup,
   PhoneCall,
   MapPin,
@@ -25,7 +21,7 @@ import {
 const CATEGORIES = ["All", "Steamed", "Crispy Fried", "Tandoori & Grill", "Signature Specials"];
 
 export default function MomoHomePage() {
-  const { openCart, totalItemsCount, cart } = useCart();
+  const { openCart, cart } = useCart();
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [momos, setMomos] = useState<MomoItem[]>([]);
   const [loading, setLoading] = useState(true);

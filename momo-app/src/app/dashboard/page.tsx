@@ -787,12 +787,13 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
+            <div className="grid grid-cols-2 gap-4 xl:grid-cols-6">
               <StatCard icon={Soup} label="Total Momos" value={momos.length} sub="In the catalog" color="bg-amber-500/15 text-amber-400 border border-amber-500/25" />
               <StatCard icon={ShoppingBag} label="Total Orders" value={orders.length} sub="All time" color="bg-blue-500/15 text-blue-400 border border-blue-500/25" />
               <StatCard icon={TrendingUp} label="Active Orders" value={activeOrders} sub="In progress" color="bg-orange-500/15 text-orange-400 border border-orange-500/25" />
+              <StatCard icon={DollarSign} label="Total Revenue" value={formatCurrency(totalRevenue)} sub="Excl. cancelled" color="bg-emerald-500/15 text-emerald-400 border border-emerald-500/25" />
               <StatCard icon={X} label="Cancelled Orders" value={cancelledOrdersCount} sub="Can be deleted" color="bg-rose-500/15 text-rose-400 border border-rose-500/25" />
-              <StatCard icon={DollarSign} label="Market Dues (Baki)" value={formatCurrency(totalPendingDebt)} sub={`${pendingDebtOrders.length} customer${pendingDebtOrders.length !== 1 ? "s" : ""} pending`} color="bg-red-500/15 text-red-400 border border-red-500/25" />
+              <StatCard icon={DollarSign} label="Market Dues" value={formatCurrency(totalPendingDebt)} sub={`${pendingDebtOrders.length} customer${pendingDebtOrders.length !== 1 ? "s" : ""} pending`} color="bg-red-500/15 text-red-400 border border-red-500/25" />
             </div>
 
             {/* Pending Customer Dues Breakdown */}

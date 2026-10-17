@@ -7,10 +7,7 @@ import {
   ShoppingBag,
   CheckCircle2,
   ShieldCheck,
-  Truck,
-  ArrowRight,
   PhoneCall,
-  Clock,
   Layers,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
