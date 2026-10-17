@@ -2,11 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import Order from "@/models/Order";
 import { generateReceiptPDF } from "@/lib/receipt";
-import { sendTelegramDocument, getOrderKeyboard } from "@/lib/telegram";
-import { appendOrderToSheet } from "@/lib/sheetbest";
+import { sendTelegramDocument, sendTelegramMessage, getOrderKeyboard } from "@/lib/telegram";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
+
+function escapeTelegramHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -132,62 +138,65 @@ export async function POST(request: NextRequest) {
     const telegramToken = process.env.TELEGRAM_TOKEN;
     const telegramChatId = process.env.TELEGRAM_CHAT_ID;
 
-    if (telegramToken && telegramChatId && pdfBuffer) {
-      try {
-        const itemLines = items
-          .map((i: any) => `• ${i.name} (${i.variant || "Standard"}) x${i.quantity} @ Rs.${i.price}`)
-          .join("\n");
+    if (telegramToken && telegramChatId) {
+      const itemLines = items
+        .map(
+          (i: any) =>
+            `• ${escapeTelegramHtml(String(i.name))} (${escapeTelegramHtml(String(i.variant || "Standard"))}) x${i.quantity} @ Rs.${i.price}`
+        )
+        .join("\n");
 
-        const caption =
-          `🥟 <b>NEW WHOLESALE ORDER RECEIVED!</b>\n\n` +
-          `<b>Order ID:</b> <code>${orderId}</code>\n` +
-          `<b>Customer:</b> ${customerName}${customerBusiness ? ` (${customerBusiness})` : ""}\n` +
-          `<b>Phone:</b> ${customerPhone}\n` +
-          `<b>Address:</b> ${customerAddress}\n` +
-          `<b>Items:</b>\n${itemLines}\n\n` +
-          `<b>Total Amount:</b> Rs. ${totalAmount.toLocaleString()}\n` +
-          `<b>Payment Status:</b> ⏳ Pending\n` +
-          `<b>Baki (Balance):</b> Rs. ${totalAmount.toLocaleString()}\n\n` +
-          `<i>Select an action below to update payment status:</i>`;
+      const caption =
+        `🥟 <b>NEW WHOLESALE ORDER RECEIVED!</b>\n\n` +
+        `<b>Order ID:</b> <code>${escapeTelegramHtml(orderId)}</code>\n` +
+        `<b>Customer:</b> ${escapeTelegramHtml(customerName)}${customerBusiness ? ` (${escapeTelegramHtml(customerBusiness)})` : ""}\n` +
+        `<b>Phone:</b> ${escapeTelegramHtml(customerPhone)}\n` +
+        `<b>Address:</b> ${escapeTelegramHtml(customerAddress)}\n` +
+        `<b>Items:</b>\n${itemLines}\n\n` +
+        `<b>Total Amount:</b> Rs. ${totalAmount.toLocaleString()}\n` +
+        `<b>Payment Status:</b> ⏳ Pending\n` +
+        `<b>Baki (Balance):</b> Rs. ${totalAmount.toLocaleString()}\n\n` +
+        `<i>Select an action below to update payment status:</i>`;
 
-        const replyMarkup = getOrderKeyboard(orderId);
+      const replyMarkup = getOrderKeyboard(orderId);
+      let documentSent = false;
 
-        await sendTelegramDocument({
-          token: telegramToken,
-          chatId: telegramChatId,
-          documentBuffer: pdfBuffer,
-          fileName: `Receipt-${orderId}.pdf`,
-          caption,
-          replyMarkup,
-        });
-      } catch (tgErr) {
-        console.error("Telegram alert failed:", tgErr);
+      if (pdfBuffer) {
+        try {
+          await sendTelegramDocument({
+            token: telegramToken,
+            chatId: telegramChatId,
+            documentBuffer: pdfBuffer,
+            fileName: `Receipt-${orderId}.pdf`,
+            caption,
+            replyMarkup,
+          });
+          documentSent = true;
+          console.info("Telegram order notification accepted", { orderId, delivery: "document" });
+        } catch (tgErr) {
+          console.error("Telegram document alert failed; attempting text notification:", tgErr);
+        }
+      } else {
+        console.warn("PDF receipt unavailable; sending order details without attachment.");
+      }
+
+      if (!documentSent) {
+        try {
+          await sendTelegramMessage({
+            token: telegramToken,
+            chatId: telegramChatId,
+            text: caption,
+            replyMarkup,
+          });
+          console.info("Telegram order notification accepted", { orderId, delivery: "text" });
+        } catch (tgErr) {
+          console.error("Telegram order alert failed:", tgErr);
+        }
       }
     } else {
       if (!telegramToken || !telegramChatId) {
-        console.warn("TELEGRAM_TOKEN or TELEGRAM_CHAT_ID not configured; skipping Telegram notification.");
+        console.error("TELEGRAM_TOKEN or TELEGRAM_CHAT_ID not configured; skipping Telegram notification.");
       }
-    }
-
-    // 4. Push data to Google Sheets via Sheet.best POST request
-    const sheetBestUrl = process.env.SHEET_BEST_URL;
-    if (sheetBestUrl) {
-      try {
-        await appendOrderToSheet(sheetBestUrl, {
-          Date: dateFormatted,
-          Order_ID: orderId,
-          Name: customerName,
-          Phone: customerPhone,
-          Total: totalAmount,
-          Paid_Amount: 0,
-          Baki_Amount: totalAmount,
-          Payment_Status: "Pending",
-        });
-      } catch (sheetErr) {
-        console.error("Sheet.best sync failed:", sheetErr);
-      }
-    } else {
-      console.warn("SHEET_BEST_URL not configured; skipping Sheet.best logging.");
     }
 
     return NextResponse.json(

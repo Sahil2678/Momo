@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrdersFromSheet } from "@/lib/sheetbest";
 import { sendTelegramMessage } from "@/lib/telegram";
+import { connectToDatabase } from "@/lib/mongodb";
+import Order from "@/models/Order";
 
 export const dynamic = "force-dynamic";
 
@@ -22,11 +23,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const sheetBestUrl = process.env.SHEET_BEST_URL;
     const telegramToken = process.env.TELEGRAM_TOKEN;
     const telegramChatId = process.env.TELEGRAM_CHAT_ID;
 
-    let pendingOrders: Array<{
+    const pendingOrders: Array<{
       Name: string;
       Phone: string;
       Order_ID: string;
@@ -34,51 +34,25 @@ export async function GET(request: NextRequest) {
       Baki_Amount: number;
     }> = [];
 
-    // 2. Fetch pending orders: Try Sheet.best first, fallback to MongoDB if SHEET_BEST_URL is missing
-    if (sheetBestUrl) {
-      const allOrders = await getOrdersFromSheet(sheetBestUrl);
-      pendingOrders = (allOrders || [])
-        .filter((order) => {
-          const status = (order.Payment_Status || "").trim().toLowerCase();
-          const baki = parseFloat(String(order.Baki_Amount || 0));
-          const isPendingOrPart =
-            status.includes("pending") ||
-            status.includes("part") ||
-            status === "pend";
+    await connectToDatabase();
+    const dbOrders = await Order.find({
+      $or: [{ status: "pending" }, { bakiAmount: { $gt: 0 } }],
+    }).sort({ createdAt: -1 });
 
-          return isPendingOrPart && !isNaN(baki) && baki > 0;
+    pendingOrders.push(
+      ...dbOrders
+        .map((order) => {
+          const bakiAmount = typeof order.bakiAmount === "number" ? order.bakiAmount : order.total;
+          return {
+            Name: order.customer?.name || order.customer?.ownerName || "Customer",
+            Phone: order.customer?.phone || "N/A",
+            Order_ID: String(order._id),
+            Payment_Status: order.paymentStatus || (order.status === "confirmed" ? "Partially Paid" : "Pending"),
+            Baki_Amount: bakiAmount,
+          };
         })
-        .map((order) => ({
-          Name: order.Name || "Customer",
-          Phone: order.Phone || "N/A",
-          Order_ID: order.Order_ID || "N/A",
-          Payment_Status: order.Payment_Status || "Pending",
-          Baki_Amount: parseFloat(String(order.Baki_Amount || 0)),
-        }));
-    } else {
-      // Fallback directly to MongoDB!
-      const { connectToDatabase } = await import("@/lib/mongodb");
-      const Order = (await import("@/models/Order")).default;
-      await connectToDatabase();
-
-      const dbOrders = await Order.find({
-        $or: [
-          { status: "pending" },
-          { bakiAmount: { $gt: 0 } },
-        ],
-      }).sort({ createdAt: -1 });
-
-      pendingOrders = dbOrders.map((o: any) => {
-        const baki = typeof o.bakiAmount === "number" ? o.bakiAmount : o.total;
-        return {
-          Name: o.customer?.name || o.customer?.ownerName || "Customer",
-          Phone: o.customer?.phone || "N/A",
-          Order_ID: String(o._id),
-          Payment_Status: o.status === "confirmed" ? "Partially Paid" : "Pending",
-          Baki_Amount: baki,
-        };
-      }).filter((o) => o.Baki_Amount > 0);
-    }
+        .filter((order) => order.Baki_Amount > 0)
+    );
 
     // Calculate total outstanding market credit
     const totalOutstandingMarketCredit = pendingOrders.reduce((sum, order) => {

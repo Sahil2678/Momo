@@ -54,7 +54,11 @@ export async function sendTelegramDocument({
     body: formData,
   });
 
-  return await res.json();
+  const result = await res.json();
+  if (!res.ok || result.ok !== true) {
+    throw new Error(result.description || `Telegram sendDocument failed with status ${res.status}`);
+  }
+  return result;
 }
 
 export async function sendTelegramMessage({
@@ -90,7 +94,11 @@ export async function sendTelegramMessage({
     body: JSON.stringify(body),
   });
 
-  return await res.json();
+  const result = await res.json();
+  if (!res.ok || result.ok !== true) {
+    throw new Error(result.description || `Telegram sendMessage failed with status ${res.status}`);
+  }
+  return result;
 }
 
 export async function editTelegramMessageText({

@@ -5,10 +5,6 @@ import {
   editTelegramMessageText,
   sendTelegramMessage,
 } from "@/lib/telegram";
-import {
-  getOrderByIdFromSheet,
-  patchOrderByOrderId,
-} from "@/lib/sheetbest";
 import { connectToDatabase } from "@/lib/mongodb";
 import Order from "@/models/Order";
 
@@ -17,24 +13,23 @@ export const dynamic = "force-dynamic";
 /**
  * Maps callback action key to clean status text and emojis
  */
-function getStatusMapping(action: string): { label: string; sheetStatus: string; dbStatus: string } {
+function getStatusMapping(action: string): { label: string; paymentStatus: string; dbStatus: string } {
   switch (action) {
     case "paid":
-      return { label: "✅ Paid", sheetStatus: "Paid", dbStatus: "confirmed" };
+      return { label: "✅ Paid", paymentStatus: "Paid", dbStatus: "confirmed" };
     case "sched":
-      return { label: "📅 Scheduled", sheetStatus: "Scheduled", dbStatus: "preparing" };
+      return { label: "📅 Scheduled", paymentStatus: "Scheduled", dbStatus: "preparing" };
     case "part":
-      return { label: "💵 Partially Paid", sheetStatus: "Partially Paid", dbStatus: "confirmed" };
+      return { label: "💵 Partially Paid", paymentStatus: "Partially Paid", dbStatus: "confirmed" };
     case "pend":
-      return { label: "⏳ Pending", sheetStatus: "Pending", dbStatus: "pending" };
+      return { label: "⏳ Pending", paymentStatus: "Pending", dbStatus: "pending" };
     default:
-      return { label: action, sheetStatus: action, dbStatus: "confirmed" };
+      return { label: action, paymentStatus: action, dbStatus: "confirmed" };
   }
 }
 
 export async function POST(request: NextRequest) {
   const telegramToken = process.env.TELEGRAM_TOKEN;
-  const sheetBestUrl = process.env.SHEET_BEST_URL;
 
   if (!telegramToken) {
     console.error("TELEGRAM_TOKEN is missing in environment variables");
@@ -83,51 +78,39 @@ export async function POST(request: NextRequest) {
         }
 
         // CASE A: Direct status change (Paid, Scheduled, Pending)
-        const { label, sheetStatus, dbStatus } = getStatusMapping(action);
+        const { label, paymentStatus, dbStatus } = getStatusMapping(action);
 
-        // 1. Update Sheet.best
-        if (sheetBestUrl) {
-          try {
-            const updates: Record<string, any> = {
-              Payment_Status: sheetStatus,
-            };
-
-            // If marked Paid, auto balance Paid_Amount and Baki_Amount
-            if (action === "paid") {
-              const currentOrder = await getOrderByIdFromSheet(sheetBestUrl, orderId);
-              if (currentOrder && currentOrder.Total) {
-                const totalNum = Number(currentOrder.Total) || 0;
-                updates.Paid_Amount = totalNum;
-                updates.Baki_Amount = 0;
-              }
-            }
-
-            await patchOrderByOrderId(sheetBestUrl, orderId, updates);
-          } catch (sheetErr) {
-            console.error(`Sheet.best PATCH error for order ${orderId}:`, sheetErr);
-          }
+        if (!orderId.match(/^[0-9a-fA-F]{24}$/)) {
+          await sendTelegramMessage({
+            token: telegramToken,
+            chatId,
+            text: `⚠️ Order <code>${orderId}</code> is not stored in the database, so its status cannot be updated.`,
+            replyToMessageId: messageId,
+          });
+          return NextResponse.json({ ok: false, error: "Order is not stored in the database" }, { status: 404 });
         }
 
-        // 2. Update MongoDB status, balance & paymentStatus if connected
-        try {
-          await connectToDatabase();
-          if (orderId.match(/^[0-9a-fA-F]{24}$/)) {
-            const dbUpdates: Record<string, any> = {
-              status: dbStatus,
-              paymentStatus: sheetStatus,
-            };
-            if (action === "paid") {
-              const currentOrder = await Order.findById(orderId);
-              if (currentOrder) {
-                dbUpdates.paidAmount = currentOrder.total;
-                dbUpdates.bakiAmount = 0;
-              }
-            }
-            await Order.findByIdAndUpdate(orderId, dbUpdates);
-          }
-        } catch (dbErr) {
-          console.warn("DB update failed (non-critical):", dbErr);
+        await connectToDatabase();
+        const currentOrder = await Order.findById(orderId);
+        if (!currentOrder) {
+          await sendTelegramMessage({
+            token: telegramToken,
+            chatId,
+            text: `⚠️ Could not find order <code>${orderId}</code> in the database. Status was not updated.`,
+            replyToMessageId: messageId,
+          });
+          return NextResponse.json({ ok: false, error: "Order not found" }, { status: 404 });
         }
+
+        const dbUpdates: Record<string, unknown> = {
+          status: dbStatus,
+          paymentStatus,
+        };
+        if (action === "paid") {
+          dbUpdates.paidAmount = currentOrder.total;
+          dbUpdates.bakiAmount = 0;
+        }
+        await Order.findByIdAndUpdate(orderId, dbUpdates);
 
         // 3. Update the Telegram message to reflect the new status and REMOVE inline buttons permanently
         try {
@@ -201,7 +184,7 @@ export async function POST(request: NextRequest) {
           console.error("Failed to edit Telegram message:", tgEditErr);
         }
 
-        return NextResponse.json({ ok: true, statusUpdatedTo: sheetStatus });
+        return NextResponse.json({ ok: true, statusUpdatedTo: paymentStatus });
       }
     }
 
@@ -235,67 +218,44 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ ok: true, error: "Invalid number format" });
         }
 
+        if (!orderId.match(/^[0-9a-fA-F]{24}$/)) {
+          await sendTelegramMessage({
+            token: telegramToken,
+            chatId,
+            text: `⚠️ Order <code>${orderId}</code> is not stored in the database, so its payment cannot be updated.`,
+            replyToMessageId: msg.message_id,
+          });
+          return NextResponse.json({ ok: false, error: "Order is not stored in the database" }, { status: 404 });
+        }
+
         let orderTotal = 0;
         let customerName = "Customer";
 
-        // Fetch the total bill of that Order_ID
-        if (sheetBestUrl) {
-          try {
-            const sheetRow = await getOrderByIdFromSheet(sheetBestUrl, orderId);
-            if (sheetRow) {
-              orderTotal = Number(sheetRow.Total) || 0;
-              if (sheetRow.Name) customerName = sheetRow.Name;
-            }
-          } catch (e) {
-            console.error("Failed to fetch order from Sheet.best:", e);
-          }
+        await connectToDatabase();
+        const dbOrder = await Order.findById(orderId);
+        if (!dbOrder) {
+          await sendTelegramMessage({
+            token: telegramToken,
+            chatId,
+            text: `⚠️ Could not find order <code>${orderId}</code> in the database. Payment was not updated.`,
+            replyToMessageId: msg.message_id,
+          });
+          return NextResponse.json({ ok: false, error: "Order not found" }, { status: 404 });
         }
 
-        // Fallback to Mongo if Sheet total is 0 or unavailable
-        if (orderTotal === 0 && orderId.match(/^[0-9a-fA-F]{24}$/)) {
-          try {
-            await connectToDatabase();
-            const dbOrder = await Order.findById(orderId);
-            if (dbOrder) {
-              orderTotal = Number(dbOrder.total) || 0;
-              customerName = dbOrder.customer?.name || customerName;
-            }
-          } catch (e) {
-            console.warn("Mongo lookup fallback failed:", e);
-          }
-        }
+        orderTotal = Number(dbOrder.total) || 0;
+        customerName = dbOrder.customer?.name || customerName;
 
         // Calculate remainder: Baki_Amount = Total - Paid
         const bakiAmount = Math.max(0, orderTotal - paidNumber);
         const paymentStatus = bakiAmount === 0 ? "Paid" : "Partially Paid";
 
-        // Send PATCH request to Sheet.best
-        if (sheetBestUrl) {
-          try {
-            await patchOrderByOrderId(sheetBestUrl, orderId, {
-              Paid_Amount: paidNumber,
-              Baki_Amount: bakiAmount,
-              Payment_Status: paymentStatus,
-            });
-          } catch (sheetPatchErr) {
-            console.error(`Sheet.best PATCH error for ${orderId}:`, sheetPatchErr);
-          }
-        }
-
-        // Also update MongoDB
-        try {
-          await connectToDatabase();
-          if (orderId.match(/^[0-9a-fA-F]{24}$/)) {
-            await Order.findByIdAndUpdate(orderId, {
-              paidAmount: paidNumber,
-              bakiAmount: bakiAmount,
-              paymentStatus: paymentStatus,
-              status: bakiAmount === 0 ? "confirmed" : "pending",
-            });
-          }
-        } catch (dbErr) {
-          console.warn("MongoDB update for partial payment failed:", dbErr);
-        }
+        await Order.findByIdAndUpdate(orderId, {
+          paidAmount: paidNumber,
+          bakiAmount,
+          paymentStatus,
+          status: bakiAmount === 0 ? "confirmed" : "pending",
+        });
 
         // Send a confirmation message back to the group
         const confirmationText =

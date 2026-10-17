@@ -20,6 +20,12 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Telegram order notifications
+
+The order API reads `TELEGRAM_TOKEN` and `TELEGRAM_CHAT_ID` on the server. Add both variables in the Vercel project's **Settings > Environment Variables** for the Production environment (and Preview too, if testing preview deployments), then redeploy. Do not prefix them with `NEXT_PUBLIC_` or commit their values. The bot must also be able to send messages to the configured chat.
+
+If an order still does not appear, check the Vercel function logs for the order API request; Telegram API errors are logged there. If the receipt PDF cannot be sent, the API attempts to send the order details as a text message instead.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
