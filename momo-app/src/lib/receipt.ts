@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import { normalizeSpecialFont } from "@/lib/font-styles";
 
 export interface ReceiptItem {
   name: string;
@@ -31,9 +32,9 @@ export async function generateReceiptPDF(data: ReceiptData): Promise<Buffer> {
       doc.on("error", (err: Error) => reject(err));
 
       // Header
-      doc.fontSize(22).font("Helvetica-Bold").text("MOMO ARTISAN - WHOLESALE RECEIPT", { align: "center" });
+      doc.fontSize(22).font("Helvetica-Bold").text("RK MOMO - WHOLESALE RECEIPT", { align: "center" });
       doc.moveDown(0.5);
-      doc.fontSize(10).font("Helvetica").text("Fresh Artisanal Wholesale & Retail Momo", { align: "center" });
+      doc.fontSize(10).font("Helvetica").text("Fresh Wholesale & Retail Momo", { align: "center" });
       doc.moveDown(1);
       doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke("#cccccc");
       doc.moveDown(1);
@@ -49,7 +50,11 @@ export async function generateReceiptPDF(data: ReceiptData): Promise<Buffer> {
       doc.text("", 300, startY);
       doc.font("Helvetica-Bold").text("Customer Information:");
       doc.font("Helvetica");
-      doc.text(`Name: ${data.customerName}`);
+      const cleanCustomerName = normalizeSpecialFont(data.customerName);
+      const printableName = cleanCustomerName && cleanCustomerName !== data.customerName
+        ? `${data.customerName} (${cleanCustomerName})`
+        : data.customerName;
+      doc.text(`Name: ${printableName}`);
       doc.text(`Phone: ${data.phone}`);
       if (data.address) {
         doc.text(`Address: ${data.address}`);
@@ -108,7 +113,7 @@ export async function generateReceiptPDF(data: ReceiptData): Promise<Buffer> {
 
       // Footer
       doc.fontSize(8).fillColor("#6b7280").font("Helvetica").text(
-        "Thank you for ordering with Momo Artisan! For wholesale enquiries & support contact us directly.",
+        "Thank you for ordering with RK MOMO! For wholesale enquiries & support contact us directly.",
         40,
         750,
         { align: "center", width: 515 }

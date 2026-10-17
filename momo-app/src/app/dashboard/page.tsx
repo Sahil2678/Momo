@@ -25,7 +25,11 @@ import {
   Flame,
   Leaf,
   LogOut,
+  Bell,
+  FileText,
+  Menu,
 } from "lucide-react";
+import { normalizeSpecialFont } from "@/lib/font-styles";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -80,6 +84,7 @@ interface Order {
   totalPieces?: number;
   orderType?: "retail" | "bulk";
   status: OrderStatus;
+  scheduledDate?: string;
   createdAt: string;
 }
 
@@ -528,6 +533,7 @@ type Tab = "overview" | "momos" | "orders";
 export default function DashboardPage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("overview");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [momos, setMomos] = useState<MomoItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingMomos, setLoadingMomos] = useState(true);
@@ -566,22 +572,110 @@ export default function DashboardPage() {
     }
   }, [showToast]);
 
-  const fetchOrders = useCallback(async () => {
-    setLoadingOrders(true);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const previousOrderIdsRef = useRef<Set<string>>(new Set());
+  const isInitialLoadRef = useRef(true);
+
+  // Sound generator using Web Audio API (crisp, pleasant chime bell)
+  const playOrderNotificationSound = useCallback(() => {
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = "sine";
+      osc1.frequency.setValueAtTime(659.25, now); // E5
+      osc1.frequency.exponentialRampToValueAtTime(880, now + 0.15); // A5
+      gain1.gain.setValueAtTime(0.3, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.6);
+
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(880, now + 0.2);
+      osc2.frequency.exponentialRampToValueAtTime(1318.51, now + 0.45); // E6
+      gain2.gain.setValueAtTime(0.35, now + 0.2);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now + 0.2);
+      osc2.stop(now + 1.0);
+    } catch (err) {
+      console.warn("Could not play notification sound:", err);
+    }
+  }, []);
+
+  const enableNotifications = async () => {
+    setAudioEnabled(true);
+    playOrderNotificationSound();
+    if ("Notification" in window && Notification.permission !== "granted") {
+      try {
+        await Notification.requestPermission();
+      } catch (e) {
+        console.warn("Notification permission request failed", e);
+      }
+    }
+    showToast("🔔 Order sound & notifications active!", "success");
+  };
+
+  const fetchOrders = useCallback(async (isPolling = false) => {
+    if (!isPolling) setLoadingOrders(true);
     try {
       const res = await fetch("/api/orders");
       const data = await res.json();
-      if (data.success) setOrders(data.orders);
+      if (data.success && Array.isArray(data.orders)) {
+        const newOrders: Order[] = data.orders;
+
+        if (isPolling && !isInitialLoadRef.current) {
+          const freshOrders = newOrders.filter(
+            (o) => !previousOrderIdsRef.current.has(o._id)
+          );
+          if (freshOrders.length > 0) {
+            playOrderNotificationSound();
+            const latest = freshOrders[0];
+            const custName = latest.customer?.name || latest.customer?.ownerName || "Customer";
+            showToast(`🔔 New Order Received: ${custName} (₹${latest.total})`, "success");
+
+            if ("Notification" in window && Notification.permission === "granted") {
+              try {
+                new Notification("🥟 New Momo Order Received!", {
+                  body: `${custName} placed an order for ₹${latest.total}`,
+                  icon: "/icon-192.png",
+                });
+              } catch (e) {
+                console.warn("Desktop notification failed", e);
+              }
+            }
+          }
+        }
+
+        previousOrderIdsRef.current = new Set(newOrders.map((o) => o._id));
+        isInitialLoadRef.current = false;
+        setOrders(newOrders);
+      }
     } catch {
-      showToast("Failed to load orders", "error");
+      if (!isPolling) showToast("Failed to load orders", "error");
     } finally {
-      setLoadingOrders(false);
+      if (!isPolling) setLoadingOrders(false);
     }
-  }, [showToast]);
+  }, [playOrderNotificationSound, showToast]);
 
   useEffect(() => {
     fetchMomos();
-    fetchOrders();
+    fetchOrders(false);
+
+    // Auto-poll orders every 10 seconds for real-time order alerts
+    const interval = setInterval(() => {
+      fetchOrders(true);
+    }, 10000);
+
+    return () => clearInterval(interval);
   }, [fetchMomos, fetchOrders]);
 
   // ── Momo CRUD ──────────────────────────────────────────────────────────────
@@ -667,10 +761,14 @@ export default function DashboardPage() {
 
   const filteredOrders = orders.filter((o) => {
     const matchStatus = statusFilter === "all" || o.status === statusFilter;
+    const searchLower = orderSearch.toLowerCase();
+    const rawName = o.customer.name || o.customer.ownerName || "";
+    const cleanName = normalizeSpecialFont(rawName);
+
     const matchSearch =
-      (o.customer.name?.toLowerCase().includes(orderSearch.toLowerCase()) ?? false) ||
-      (o.customer.ownerName?.toLowerCase().includes(orderSearch.toLowerCase()) ?? false) ||
-      (o.customer.businessName?.toLowerCase().includes(orderSearch.toLowerCase()) ?? false) ||
+      rawName.toLowerCase().includes(searchLower) ||
+      cleanName.toLowerCase().includes(searchLower) ||
+      (o.customer.businessName?.toLowerCase().includes(searchLower) ?? false) ||
       (o.customer.phone?.includes(orderSearch) ?? false) ||
       o._id.includes(orderSearch);
     return matchStatus && matchSearch;
@@ -707,28 +805,62 @@ export default function DashboardPage() {
     { id: "momos", label: "Momo Catalog", icon: Soup, count: momos.length },
     { id: "orders", label: "Orders", icon: ShoppingBag, count: activeOrders || undefined },
   ];
+  const activeNavItem = navItems.find((item) => item.id === tab);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSidebarOpen(false);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [sidebarOpen]);
 
   return (
-    <div className="flex min-h-screen bg-[#070709] text-zinc-100 selection:bg-amber-500 selection:text-black">
+    <div className="flex min-h-screen overflow-x-hidden bg-[#070709] text-zinc-100 selection:bg-amber-500 selection:text-black">
       {/* Ambient glow */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -top-32 left-1/3 h-[400px] w-[700px] rounded-full bg-gradient-to-tr from-amber-600/10 via-orange-600/10 to-transparent blur-[120px]" />
         <div className="absolute bottom-0 right-[-5%] h-[300px] w-[400px] rounded-full bg-amber-500/5 blur-[100px]" />
       </div>
 
+      {sidebarOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation menu"
+          className="fixed inset-0 z-30 bg-black/70 backdrop-blur-sm lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="relative z-10 flex w-64 shrink-0 flex-col border-r border-white/[0.07] bg-black/40 backdrop-blur-xl">
+      <aside
+        id="dashboard-navigation"
+        className={`fixed inset-y-0 left-0 z-40 flex h-screen w-72 max-w-[85vw] shrink-0 flex-col overflow-y-auto border-r border-white/[0.07] bg-[#09090b]/95 shadow-2xl backdrop-blur-xl transition-transform duration-300 lg:sticky lg:top-0 lg:z-10 lg:h-screen lg:w-64 lg:max-w-none lg:translate-x-0 lg:transform-none lg:bg-black/40 lg:shadow-none ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         {/* Brand */}
         <div className="flex items-center gap-3 border-b border-white/[0.07] px-5 py-5">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 shadow-[0_0_20px_rgba(245,158,11,0.3)]">
             <Soup className="h-5 w-5 text-zinc-950" />
           </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="text-sm font-black tracking-tight text-white">
-              MOMO<span className="text-amber-500">ARTISAN</span>
+              RK <span className="text-amber-500">MOMO</span>
             </div>
             <div className="text-[10px] text-zinc-500 font-medium tracking-wider uppercase">Admin Panel</div>
           </div>
+          <button
+            type="button"
+            aria-label="Close navigation menu"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 hover:bg-white/[0.06] hover:text-white lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Nav */}
@@ -736,7 +868,10 @@ export default function DashboardPage() {
           {navItems.map(({ id, label, icon: Icon, count }) => (
             <button
               key={id}
-              onClick={() => setTab(id)}
+              onClick={() => {
+                setTab(id);
+                setSidebarOpen(false);
+              }}
               className={`group flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
                 tab === id
                   ? "bg-amber-500/15 border border-amber-500/25 text-amber-400 shadow-sm"
@@ -776,18 +911,35 @@ export default function DashboardPage() {
       </aside>
 
       {/* Main */}
-      <main className="relative z-10 flex-1 overflow-auto">
+      <main className="relative z-10 min-w-0 flex-1 overflow-auto">
+        <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/[0.07] bg-[#070709]/95 px-4 py-3 backdrop-blur-xl sm:px-6 lg:hidden">
+          <button
+            type="button"
+            aria-label="Open navigation menu"
+            aria-controls="dashboard-navigation"
+            aria-expanded={sidebarOpen}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-200 transition-colors hover:bg-white/[0.08]"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-white">{activeNavItem?.label}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-500">RK MOMO Admin</p>
+          </div>
+        </div>
+
         {/* ── OVERVIEW ───────────────────────────────────────────────────── */}
         {tab === "overview" && (
-          <div className="p-8">
+          <div className="p-4 sm:p-6 lg:p-8">
             <div className="mb-8">
-              <h1 className="text-3xl font-black text-white">Dashboard Overview</h1>
+              <h1 className="text-2xl font-black text-white sm:text-3xl">Dashboard Overview</h1>
               <p className="mt-1 text-sm text-zinc-500">
                 Real-time snapshot of your momo business.
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 xl:grid-cols-6">
+            <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:grid-cols-3 sm:gap-4 xl:grid-cols-6">
               <StatCard icon={Soup} label="Total Momos" value={momos.length} sub="In the catalog" color="bg-amber-500/15 text-amber-400 border border-amber-500/25" />
               <StatCard icon={ShoppingBag} label="Total Orders" value={orders.length} sub="All time" color="bg-blue-500/15 text-blue-400 border border-blue-500/25" />
               <StatCard icon={TrendingUp} label="Active Orders" value={activeOrders} sub="In progress" color="bg-orange-500/15 text-orange-400 border border-orange-500/25" />
@@ -798,8 +950,8 @@ export default function DashboardPage() {
 
             {/* Pending Customer Dues Breakdown */}
             {pendingDebtOrders.length > 0 && (
-              <div className="mt-8 rounded-2xl border border-red-500/20 bg-red-500/[0.03] p-6 backdrop-blur-xl">
-                <div className="flex items-center justify-between mb-4">
+              <div className="mt-8 rounded-2xl border border-red-500/20 bg-red-500/[0.03] p-4 backdrop-blur-xl sm:p-6">
+                <div className="mb-4 flex flex-col gap-3 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
                   <div className="flex items-center gap-2.5">
                     <AlertCircle className="h-5 w-5 text-red-400" />
                     <h2 className="text-base font-bold text-white">Pending Customer Payments (Baki List)</h2>
@@ -850,63 +1002,121 @@ export default function DashboardPage() {
                     <p className="text-sm">No orders yet.</p>
                   </div>
                 ) : (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-white/[0.07] text-left text-xs font-semibold uppercase tracking-wider text-zinc-600">
-                        <th className="px-5 py-3.5">Customer / Business</th>
-                        <th className="px-5 py-3.5">Items</th>
-                        <th className="px-5 py-3.5">Total Bill</th>
-                        <th className="px-5 py-3.5">Payment (Telegram)</th>
-                        <th className="px-5 py-3.5">Order Status</th>
-                        <th className="px-5 py-3.5">Time</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {orders.slice(0, 6).map((order) => (
-                        <tr key={order._id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
-                          <td className="px-5 py-3.5">
-                            <div className="font-semibold text-white">
-                              {order.customer.name || order.customer.ownerName || order.customer.businessName || "Customer"}
-                            </div>
-                            <div className="text-xs text-zinc-500">
-                              {order.customer.businessName || order.customer.phone}
-                            </div>
-                          </td>
-                          <td className="px-5 py-3.5 text-zinc-400">
-                            <div>{order.items.length} item{order.items.length !== 1 ? "s" : ""}</div>
-                            <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                              order.orderType === "bulk" || (order.totalPieces && order.totalPieces >= 500)
-                                ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/25"
-                                : "bg-blue-500/15 text-blue-300 border border-blue-500/25"
-                            }`}>
-                              {order.orderType === "bulk" || (order.totalPieces && order.totalPieces >= 500)
-                                ? "Bulk (500+)"
-                                : "Retail"}
-                            </span>
-                          </td>
-                          <td className="px-5 py-3.5 font-bold text-amber-400">{formatCurrency(order.total)}</td>
-                          <td className="px-5 py-3.5">
-                            <span className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${
-                              PAYMENT_STATUS_STYLES[order.paymentStatus || "Pending"] || PAYMENT_STATUS_STYLES.Pending
-                            }`}>
-                              {order.paymentStatus || "Pending"}
-                            </span>
-                            {order.bakiAmount !== undefined && order.bakiAmount > 0 && (
-                              <div className="text-[10px] text-rose-400 font-semibold mt-0.5">
-                                Baki: {formatCurrency(order.bakiAmount)}
+                  <>
+                    <div className="space-y-3 p-3 xl:hidden">
+                      {orders.slice(0, 6).map((order) => {
+                        const isBulk = order.orderType === "bulk" || (order.totalPieces ?? 0) >= 500;
+                        const customerName =
+                          order.customer.name || order.customer.ownerName || order.customer.businessName || "Customer";
+
+                        return (
+                          <article
+                            key={order._id}
+                            className="min-w-0 rounded-xl border border-white/[0.07] bg-white/[0.02] p-4"
+                          >
+                            <div className="flex min-w-0 items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <h3 className="break-words font-semibold text-white">{customerName}</h3>
+                                <p className="mt-1 break-all text-xs text-zinc-500">
+                                  {order.customer.businessName || order.customer.phone}
+                                </p>
                               </div>
-                            )}
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <span className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${STATUS_STYLES[order.status]}`}>
-                              {order.status}
-                            </span>
-                          </td>
-                          <td className="px-5 py-3.5 text-zinc-500 text-xs">{timeAgo(order.createdAt)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                              <span className="shrink-0 text-right font-bold text-amber-400">
+                                {formatCurrency(order.total)}
+                              </span>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <span className={`rounded border px-2 py-1 text-[10px] font-bold ${
+                                isBulk
+                                  ? "border-emerald-500/25 bg-emerald-500/15 text-emerald-300"
+                                  : "border-blue-500/25 bg-blue-500/15 text-blue-300"
+                              }`}>
+                                {isBulk ? "Bulk (500+)" : "Retail"} · {order.items.length} item{order.items.length !== 1 ? "s" : ""}
+                              </span>
+                              <span className={`rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                                PAYMENT_STATUS_STYLES[order.paymentStatus || "Pending"] || PAYMENT_STATUS_STYLES.Pending
+                              }`}>
+                                {order.paymentStatus || "Pending"}
+                              </span>
+                              <span className={`rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${STATUS_STYLES[order.status]}`}>
+                                {order.status}
+                              </span>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.06] pt-3 text-xs">
+                              {order.bakiAmount !== undefined && order.bakiAmount > 0 ? (
+                                <span className="font-semibold text-rose-400">Baki: {formatCurrency(order.bakiAmount)}</span>
+                              ) : (
+                                <span className="text-zinc-600">No outstanding balance</span>
+                              )}
+                              <span className="text-zinc-500">{timeAgo(order.createdAt)}</span>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+
+                    <div className="hidden overflow-x-auto xl:block">
+                      <table className="w-full min-w-[900px] text-sm">
+                        <thead>
+                          <tr className="border-b border-white/[0.07] text-left text-xs font-semibold uppercase tracking-wider text-zinc-600">
+                            <th className="px-5 py-3.5">Customer / Business</th>
+                            <th className="px-5 py-3.5">Items</th>
+                            <th className="px-5 py-3.5">Total Bill</th>
+                            <th className="px-5 py-3.5">Payment (Telegram)</th>
+                            <th className="px-5 py-3.5">Order Status</th>
+                            <th className="px-5 py-3.5">Time</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {orders.slice(0, 6).map((order) => (
+                            <tr key={order._id} className="border-b border-white/[0.04] transition-colors hover:bg-white/[0.02]">
+                              <td className="px-5 py-3.5">
+                                <div className="font-semibold text-white">
+                                  {order.customer.name || order.customer.ownerName || order.customer.businessName || "Customer"}
+                                </div>
+                                <div className="text-xs text-zinc-500">
+                                  {order.customer.businessName || order.customer.phone}
+                                </div>
+                              </td>
+                              <td className="px-5 py-3.5 text-zinc-400">
+                                <div>{order.items.length} item{order.items.length !== 1 ? "s" : ""}</div>
+                                <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                                  order.orderType === "bulk" || (order.totalPieces && order.totalPieces >= 500)
+                                    ? "border border-emerald-500/25 bg-emerald-500/15 text-emerald-300"
+                                    : "border border-blue-500/25 bg-blue-500/15 text-blue-300"
+                                }`}>
+                                  {order.orderType === "bulk" || (order.totalPieces && order.totalPieces >= 500)
+                                    ? "Bulk (500+)"
+                                    : "Retail"}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3.5 font-bold text-amber-400">{formatCurrency(order.total)}</td>
+                              <td className="px-5 py-3.5">
+                                <span className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${
+                                  PAYMENT_STATUS_STYLES[order.paymentStatus || "Pending"] || PAYMENT_STATUS_STYLES.Pending
+                                }`}>
+                                  {order.paymentStatus || "Pending"}
+                                </span>
+                                {order.bakiAmount !== undefined && order.bakiAmount > 0 && (
+                                  <div className="mt-0.5 text-[10px] font-semibold text-rose-400">
+                                    Baki: {formatCurrency(order.bakiAmount)}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-5 py-3.5">
+                                <span className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${STATUS_STYLES[order.status]}`}>
+                                  {order.status}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3.5 text-xs text-zinc-500">{timeAgo(order.createdAt)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -914,7 +1124,7 @@ export default function DashboardPage() {
             {/* Category breakdown */}
             <div className="mt-6">
               <h2 className="mb-4 text-lg font-bold text-white">Catalog Breakdown</h2>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:grid-cols-4">
                 {CATEGORIES.map((cat) => {
                   const count = momos.filter((m) => m.category === cat).length;
                   return (
@@ -931,10 +1141,10 @@ export default function DashboardPage() {
 
         {/* ── MOMO CATALOG ───────────────────────────────────────────────── */}
         {tab === "momos" && (
-          <div className="p-8">
+          <div className="p-4 sm:p-6 lg:p-8">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h1 className="text-3xl font-black text-white">Momo Catalog</h1>
+                <h1 className="text-2xl font-black text-white sm:text-3xl">Momo Catalog</h1>
                 <p className="mt-1 text-sm text-zinc-500">{momos.length} items in catalog</p>
               </div>
               <button
@@ -1053,19 +1263,33 @@ export default function DashboardPage() {
 
         {/* ── ORDERS ─────────────────────────────────────────────────────── */}
         {tab === "orders" && (
-          <div className="p-8">
+          <div className="p-4 sm:p-6 lg:p-8">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h1 className="text-3xl font-black text-white">Orders</h1>
+                <h1 className="text-2xl font-black text-white sm:text-3xl">Orders</h1>
                 <p className="mt-1 text-sm text-zinc-500">{orders.length} total orders</p>
               </div>
-              <button
-                onClick={fetchOrders}
-                className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-white/[0.07] transition-all"
-              >
-                <Users className="h-4 w-4" />
-                Refresh
-              </button>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  onClick={enableNotifications}
+                  className={`flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all shadow-sm ${
+                    audioEnabled
+                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                      : "border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 animate-pulse"
+                  }`}
+                  title="Enable sound chime and push alerts for new incoming orders"
+                >
+                  <Bell className="h-4 w-4" />
+                  {audioEnabled ? "Sound Alerts Active 🔔" : "Enable Sound Alert 🔔"}
+                </button>
+                <button
+                  onClick={() => fetchOrders(false)}
+                  className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-white/[0.07] transition-all"
+                >
+                  <Users className="h-4 w-4" />
+                  Refresh
+                </button>
+              </div>
             </div>
 
             {/* Filters */}
@@ -1129,6 +1353,11 @@ export default function DashboardPage() {
                           <span className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${STATUS_STYLES[order.status]}`}>
                             {order.status}
                           </span>
+                          {order.scheduledDate && (
+                            <span className="inline-flex items-center rounded-lg border border-purple-500/30 bg-purple-500/15 px-2.5 py-1 text-[10px] font-bold text-purple-300">
+                              📅 Slot: {order.scheduledDate}
+                            </span>
+                          )}
                         </div>
                         <div className="mt-1 text-xs text-zinc-400">
                           {order.customer.businessName && <span className="font-medium text-amber-400">{order.customer.businessName} · </span>}
@@ -1194,8 +1423,20 @@ export default function DashboardPage() {
                         ))}
                       </div>
 
-                      {/* Delete button (Only for Cancelled orders) */}
-                      {order.status === "cancelled" && (
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={`/api/orders/${order._id}/receipt?download=1`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-bold text-zinc-300 hover:bg-white/[0.08] hover:text-white transition-all"
+                          title="Download PDF Receipt"
+                        >
+                          <FileText className="h-3.5 w-3.5 text-amber-400" />
+                          Receipt
+                        </a>
+
+                        {/* Delete button (Only for Cancelled orders) */}
+                        {order.status === "cancelled" && (
                         <div>
                           {orderDeleteConfirm === order._id ? (
                             <div className="flex items-center gap-2">
@@ -1224,6 +1465,7 @@ export default function DashboardPage() {
                           )}
                         </div>
                       )}
+                      </div>
                     </div>
                   </div>
                 ))}

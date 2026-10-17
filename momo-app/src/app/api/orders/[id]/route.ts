@@ -17,10 +17,11 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const { status } = await request.json();
+    const body = await request.json();
+    const { status, scheduledDate, paymentStatus, paidAmount, bakiAmount } = body;
 
     const validStatuses = ["pending", "confirmed", "preparing", "delivered", "cancelled"];
-    if (!validStatuses.includes(status)) {
+    if (status && !validStatuses.includes(status)) {
       return NextResponse.json(
         { success: false, error: "Invalid status value." },
         { status: 400 }
@@ -29,9 +30,16 @@ export async function PATCH(
 
     await connectToDatabase();
 
+    const updateFields: Record<string, unknown> = {};
+    if (status) updateFields.status = status;
+    if (scheduledDate !== undefined) updateFields.scheduledDate = scheduledDate;
+    if (paymentStatus !== undefined) updateFields.paymentStatus = paymentStatus;
+    if (paidAmount !== undefined) updateFields.paidAmount = paidAmount;
+    if (bakiAmount !== undefined) updateFields.bakiAmount = bakiAmount;
+
     const updated = await Order.findByIdAndUpdate(
       id,
-      { $set: { status } },
+      { $set: updateFields },
       { new: true }
     );
 

@@ -33,3 +33,21 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Prevent white autofill flash in dark inputs */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f4f4f5 !important;
+  -webkit-box-shadow: 0 0 0px 1000px #18181b inset !important;
+  box-shadow: 0 0 0px 1000px #18181b inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Ensure special fonts and Unicode glyphs render properly */
+input, textarea {
+  font-family: var(--font-geist-sans), "Segoe UI Symbol", "Apple Color Emoji", "Segoe UI Emoji", "Noto Sans", system-ui, sans-serif;
+}

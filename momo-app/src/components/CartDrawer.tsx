@@ -17,7 +17,10 @@ import {
   ShieldCheck,
   Bike,
   Sparkles,
+  FileText,
 } from "lucide-react";
+
+import { generateFontStyles, normalizeSpecialFont } from "@/lib/font-styles";
 
 export function CartDrawer() {
   const {
@@ -44,6 +47,7 @@ export function CartDrawer() {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showFontPicker, setShowFontPicker] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState<{
     message?: string;
     orderId?: string;
@@ -56,6 +60,14 @@ export function CartDrawer() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // Local string values for quantity inputs — allows clearing before typing a new number
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
+
+  // When new items are added to the cart, automatically clear any previous orderSuccess
+  // so the user immediately sees their cart instead of having to manually click "Order More Momos"
+  React.useEffect(() => {
+    if (cart.length > 0 && orderSuccess) {
+      setOrderSuccess(null);
+    }
+  }, [cart.length, orderSuccess]);
 
   if (!isOpen) return null;
 
@@ -70,6 +82,12 @@ export function CartDrawer() {
 
     if (!customer.name.trim() || !customer.phone.trim() || !customer.address.trim()) {
       setErrorMessage("Please complete all required fields (Name, Phone, Delivery Address).");
+      return;
+    }
+
+    const cleanPhone = customer.phone.replace(/\D/g, "");
+    if (cleanPhone.length !== 10) {
+      setErrorMessage("Please enter a valid 10-digit mobile number.");
       return;
     }
 
@@ -220,9 +238,21 @@ export function CartDrawer() {
                   </div>
                 </div>
 
+                {orderSuccess.orderId && (
+                  <a
+                    href={`/api/orders/${orderSuccess.orderId}/receipt?download=1`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/[0.06] py-2.5 text-xs font-semibold text-zinc-200 transition hover:bg-white/10 hover:text-white"
+                  >
+                    <FileText className="h-4 w-4 text-amber-400" />
+                    Download PDF Receipt
+                  </a>
+                )}
+
                 <button
                   onClick={handleReset}
-                  className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-sm font-bold text-zinc-950 transition hover:from-amber-400 hover:to-orange-400"
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-sm font-bold text-zinc-950 transition hover:from-amber-400 hover:to-orange-400 shadow-[0_0_20px_rgba(245,158,11,0.2)]"
                 >
                   Order More Momos
                 </button>
@@ -374,9 +404,19 @@ export function CartDrawer() {
 
                       <form id="checkout-form" onSubmit={handleSubmitOrder} className="space-y-3">
                         <div>
-                          <label className="mb-1 block text-[11px] font-medium text-zinc-400">
-                            Your Name *
-                          </label>
+                          <div className="mb-1 flex items-center justify-between">
+                            <label className="text-[11px] font-medium text-zinc-400">
+                              Your Name *
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => setShowFontPicker(!showFontPicker)}
+                              className="flex items-center gap-1 text-[11px] font-semibold text-amber-400 hover:text-amber-300 transition-colors"
+                            >
+                              <Sparkles className="h-3 w-3" />
+                              <span>{showFontPicker ? "Hide Font Styles" : "✨ Special Font Styles"}</span>
+                            </button>
+                          </div>
                           <input
                             type="text"
                             required
@@ -385,19 +425,60 @@ export function CartDrawer() {
                             onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
                             className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-amber-500 focus:bg-white/[0.06] focus:outline-none transition"
                           />
+
+                          {/* Special Font Style Picker */}
+                          {showFontPicker && (
+                            <div className="mt-2.5 rounded-xl border border-amber-500/30 bg-amber-500/[0.05] p-3 text-xs animate-in fade-in-50 zoom-in-95">
+                              <div className="mb-2 flex items-center justify-between">
+                                <span className="text-[11px] font-bold text-amber-400">
+                                  Tap a style to apply to your name:
+                                </span>
+                                {normalizeSpecialFont(customer.name) !== customer.name && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setCustomer({ ...customer, name: normalizeSpecialFont(customer.name) })}
+                                    className="text-[10px] text-zinc-400 hover:text-white underline"
+                                  >
+                                    Reset Normal
+                                  </button>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-1 gap-1.5 max-h-48 overflow-y-auto pr-1">
+                                {generateFontStyles(normalizeSpecialFont(customer.name) || "Sahil Kumar").map((style) => (
+                                  <button
+                                    type="button"
+                                    key={style.id}
+                                    onClick={() => {
+                                      setCustomer({ ...customer, name: style.preview });
+                                      setShowFontPicker(false);
+                                    }}
+                                    className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-left text-xs text-zinc-200 transition-all hover:border-amber-500/50 hover:bg-amber-500/10 hover:text-amber-300"
+                                  >
+                                    <span className="font-medium text-white">{style.preview}</span>
+                                    <span className="text-[10px] text-zinc-500">{style.label.split("(")[0]}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         <div>
                           <label className="mb-1 block text-[11px] font-medium text-zinc-400">
-                            Phone Number *
+                            Phone Number * <span className="text-zinc-500">(10 digits only)</span>
                           </label>
                           <input
                             type="tel"
+                            inputMode="numeric"
+                            maxLength={10}
                             required
-                            placeholder="e.g. +91 98765 43210"
+                            placeholder="e.g. 9876543210"
                             value={customer.phone}
-                            onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
-                            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-amber-500 focus:bg-white/[0.06] focus:outline-none transition"
+                            onChange={(e) => {
+                              const numbersOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
+                              setCustomer({ ...customer, phone: numbersOnly });
+                            }}
+                            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-amber-500 focus:bg-white/[0.06] focus:outline-none transition tracking-wider font-mono"
                           />
                         </div>
 
@@ -483,7 +564,7 @@ export function CartDrawer() {
                 </button>
                 <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-zinc-500">
                   <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-                  <span>Fresh artisan preparation • Live kitchen tracking</span>
+                  <span>Fresh RK MOMO preparation • Live kitchen tracking</span>
                 </div>
               </div>
             )}

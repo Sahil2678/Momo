@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import {
   answerTelegramCallbackQuery,
   editTelegramMessageCaption,
@@ -9,6 +10,18 @@ import { connectToDatabase } from "@/lib/mongodb";
 import Order from "@/models/Order";
 
 export const dynamic = "force-dynamic";
+
+function hasValidWebhookSecret(request: NextRequest, secret: string): boolean {
+  const providedSecret = request.headers.get("x-telegram-bot-api-secret-token");
+  if (!providedSecret) return false;
+
+  const expectedBuffer = Buffer.from(secret);
+  const providedBuffer = Buffer.from(providedSecret);
+  return (
+    expectedBuffer.length === providedBuffer.length &&
+    timingSafeEqual(expectedBuffer, providedBuffer)
+  );
+}
 
 /**
  * Maps callback action key to clean status text and emojis
@@ -30,14 +43,40 @@ function getStatusMapping(action: string): { label: string; paymentStatus: strin
 
 export async function POST(request: NextRequest) {
   const telegramToken = process.env.TELEGRAM_TOKEN;
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  const telegramChatId = process.env.TELEGRAM_CHAT_ID;
+  const adminIds = process.env.TELEGRAM_ADMIN_IDS
+    ?.split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
 
   if (!telegramToken) {
     console.error("TELEGRAM_TOKEN is missing in environment variables");
     return NextResponse.json({ ok: false, error: "Bot token not configured" }, { status: 500 });
   }
 
+  if (!webhookSecret || !telegramChatId || !adminIds?.length || adminIds.some((id) => !/^\d+$/.test(id))) {
+    console.error("Telegram webhook security configuration is incomplete or invalid");
+    return NextResponse.json({ ok: false, error: "Webhook security is not configured" }, { status: 500 });
+  }
+
+  if (!hasValidWebhookSecret(request, webhookSecret)) {
+    return NextResponse.json({ ok: false, error: "Unauthorized webhook request" }, { status: 401 });
+  }
+
   try {
     const update = await request.json();
+    const senderId = update.callback_query?.from?.id ?? update.message?.from?.id;
+    const updateChatId = update.callback_query?.message?.chat?.id ?? update.message?.chat?.id;
+
+    if (
+      senderId === undefined ||
+      !adminIds.includes(String(senderId)) ||
+      updateChatId === undefined ||
+      String(updateChatId) !== telegramChatId
+    ) {
+      return NextResponse.json({ ok: true, ignored: true });
+    }
 
     // =========================================================================
     // CASE A & B: CALLBACK QUERY (Inline Button Clicks)
@@ -75,6 +114,34 @@ export async function POST(request: NextRequest) {
           });
 
           return NextResponse.json({ ok: true, case: "part_paid_prompt_sent" });
+        }
+
+        // CASE C: "Scheduled" Button Click -> Provide quick date buttons + prompt for delivery date
+        if (action === "sched") {
+          await sendTelegramMessage({
+            token: telegramToken,
+            chatId,
+            text: `📅 <b>SCHEDULE ORDER DELIVERY:</b>\n` +
+                  `Order ID: <code>${orderId}</code>\n\n` +
+                  `Select a delivery slot below or <b>reply directly with your custom date/time</b> (e.g. <code>Tomorrow 4 PM</code> or <code>25 Oct</code>):`,
+            replyMarkup: {
+              inline_keyboard: [
+                [
+                  { text: "⚡ Today Evening", callback_data: `setsched_${orderId}_Today Evening` },
+                  { text: "🌅 Tomorrow Morning", callback_data: `setsched_${orderId}_Tomorrow Morning` },
+                ],
+                [
+                  { text: "🌆 Tomorrow Evening", callback_data: `setsched_${orderId}_Tomorrow Evening` },
+                  { text: "📅 Day After Tomorrow", callback_data: `setsched_${orderId}_Day After Tomorrow` },
+                ],
+              ],
+              force_reply: true,
+              selective: false,
+            },
+            replyToMessageId: messageId,
+          });
+
+          return NextResponse.json({ ok: true, case: "schedule_prompt_sent" });
         }
 
         // CASE A: Direct status change (Paid, Scheduled, Pending)
@@ -186,10 +253,42 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({ ok: true, statusUpdatedTo: paymentStatus });
       }
+
+      // Handle setsched_[orderId]_[dateText]
+      if (data.startsWith("setsched_")) {
+        const parts = data.split("_");
+        const orderId = parts[1];
+        const dateText = parts.slice(2).join("_");
+
+        await answerTelegramCallbackQuery(telegramToken, callbackId);
+
+        if (!orderId.match(/^[0-9a-fA-F]{24}$/)) {
+          return NextResponse.json({ ok: false, error: "Invalid order ID" }, { status: 404 });
+        }
+
+        await connectToDatabase();
+        await Order.findByIdAndUpdate(orderId, {
+          status: "confirmed",
+          paymentStatus: "Scheduled",
+          scheduledDate: dateText,
+        });
+
+        await sendTelegramMessage({
+          token: telegramToken,
+          chatId,
+          text: `📅 <b>DELIVERY SCHEDULED!</b>\n\n` +
+                `Order ID: <code>${orderId}</code>\n` +
+                `Scheduled Delivery Slot: <b>${dateText}</b> ✅\n` +
+                `Database has been updated successfully.`,
+          replyToMessageId: messageId,
+        });
+
+        return NextResponse.json({ ok: true, case: "schedule_updated", orderId, scheduledDate: dateText });
+      }
     }
 
     // =========================================================================
-    // CASE C: HANDLING ADMIN REPLY WITH NUMBER
+    // CASE C: HANDLING ADMIN REPLIES
     // =========================================================================
     if (update.message) {
       const msg = update.message;
@@ -198,12 +297,62 @@ export async function POST(request: NextRequest) {
       const chatId = msg.chat?.id;
 
       // Check if this message is a reply to our prompt:
-      // "Order ID: [ID]\nHow much cash did you receive? Reply with the exact number only."
       const replyPrompt = replyToMsg?.text || "";
       const match = replyPrompt.match(/Order ID:\s*([^\s\n]+)/i);
 
       if (match) {
         const orderId = match[1].trim();
+
+        // 1. Check if replying to Schedule Delivery prompt
+        if (
+          replyPrompt.includes("SCHEDULE ORDER DELIVERY") ||
+          replyPrompt.includes("SCHEDULE DELIVERY DATE") ||
+          replyPrompt.toLowerCase().includes("slot")
+        ) {
+          if (!orderId.match(/^[0-9a-fA-F]{24}$/)) {
+            await sendTelegramMessage({
+              token: telegramToken,
+              chatId,
+              text: `⚠️ Order <code>${orderId}</code> is not stored in the database.`,
+              replyToMessageId: msg.message_id,
+            });
+            return NextResponse.json({ ok: false, error: "Invalid order ID" }, { status: 404 });
+          }
+
+          await connectToDatabase();
+          const dbOrder = await Order.findById(orderId);
+          if (!dbOrder) {
+            await sendTelegramMessage({
+              token: telegramToken,
+              chatId,
+              text: `⚠️ Could not find order <code>${orderId}</code> in database.`,
+              replyToMessageId: msg.message_id,
+            });
+            return NextResponse.json({ ok: false, error: "Order not found" }, { status: 404 });
+          }
+
+          const scheduledDate = text;
+          await Order.findByIdAndUpdate(orderId, {
+            status: "confirmed",
+            paymentStatus: "Scheduled",
+            scheduledDate,
+          });
+
+          await sendTelegramMessage({
+            token: telegramToken,
+            chatId,
+            text: `📅 <b>DELIVERY SCHEDULED!</b>\n\n` +
+                  `Order ID: <code>${orderId}</code>\n` +
+                  `Customer: <b>${dbOrder.customer?.name || dbOrder.customer?.ownerName || "Customer"}</b>\n` +
+                  `Scheduled Delivery: <b>${scheduledDate}</b> ✅\n` +
+                  `Database has been updated successfully.`,
+            replyToMessageId: msg.message_id,
+          });
+
+          return NextResponse.json({ ok: true, case: "schedule_updated_via_reply", orderId, scheduledDate });
+        }
+
+        // 2. Otherwise it is cash received partial payment reply
         // Parse numerical amount from user reply
         const cleanedNumber = text.replace(/[^0-9.]/g, "");
         const paidNumber = parseFloat(cleanedNumber);

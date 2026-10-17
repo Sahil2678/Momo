@@ -269,7 +269,7 @@ export default function MomoHomePage() {
           </div>
         </div>
         <div className="mt-8 text-center text-xs text-zinc-600">
-          © {new Date().getFullYear()} Momo Artisan Inc. All rights reserved.
+          © {new Date().getFullYear()} RK MOMO Inc. All rights reserved.
         </div>
       </footer>
 

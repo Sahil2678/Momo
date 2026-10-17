@@ -36,6 +36,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const [isCartLoaded, setIsCartLoaded] = useState(false);
 
   // Load cart from localStorage on initial render
   useEffect(() => {
@@ -46,17 +47,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (e) {
       console.error("Failed to load cart", e);
+    } finally {
+      setIsCartLoaded(true);
     }
   }, []);
 
   // Save cart to localStorage on changes
   useEffect(() => {
+    if (!isCartLoaded) return;
+
     try {
       localStorage.setItem("momo_artisan_cart", JSON.stringify(cart));
     } catch (e) {
       console.error("Failed to save cart", e);
     }
-  }, [cart]);
+  }, [cart, isCartLoaded]);
 
   const openCart = () => setIsOpen(true);
   const closeCart = () => setIsOpen(false);

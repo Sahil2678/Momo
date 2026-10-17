@@ -88,7 +88,7 @@ function LoginForm() {
             </div>
             <div className="text-center">
               <div className="text-2xl font-black tracking-tight text-white">
-                MOMO<span className="text-amber-500">ARTISAN</span>
+                RK <span className="text-amber-500">MOMO</span>
               </div>
               <div className="mt-1 text-xs font-semibold uppercase tracking-widest text-zinc-500">
                 Admin Dashboard

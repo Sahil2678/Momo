@@ -42,11 +42,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate phone number format (basic check)
-    const phoneClean = customerPhone.replace(/[\s-]/g, "");
-    if (phoneClean.length < 8) {
+    // Validate phone number format (must be exactly 10 digits)
+    const phoneClean = customerPhone.replace(/\D/g, "");
+    if (phoneClean.length !== 10) {
       return NextResponse.json(
-        { success: false, error: "Please provide a valid phone number (at least 8 digits)." },
+        { success: false, error: "Please provide a valid 10-digit mobile number." },
         { status: 400 }
       );
     }

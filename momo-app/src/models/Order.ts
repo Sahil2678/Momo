@@ -29,6 +29,7 @@ export interface IOrder extends Document {
   totalPieces: number;
   orderType: "retail" | "bulk";
   status: "pending" | "confirmed" | "preparing" | "delivered" | "cancelled";
+  scheduledDate?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -84,6 +85,7 @@ const OrderSchema = new Schema<IOrder>(
       enum: ["pending", "confirmed", "preparing", "delivered", "cancelled"],
       default: "confirmed",
     },
+    scheduledDate: { type: String, trim: true },
   },
   {
     timestamps: true,

@@ -26,6 +26,16 @@ The order API reads `TELEGRAM_TOKEN` and `TELEGRAM_CHAT_ID` on the server. Add b
 
 If an order still does not appear, check the Vercel function logs for the order API request; Telegram API errors are logged there. If the receipt PDF cannot be sent, the API attempts to send the order details as a text message instead.
 
+## Secure Telegram webhook
+
+The Telegram webhook rejects requests unless these server-side Vercel Production environment variables are configured:
+
+- `TELEGRAM_WEBHOOK_SECRET`: a random secret using only letters, numbers, underscores, and hyphens. Use the same value when registering the Telegram webhook.
+- `TELEGRAM_ADMIN_IDS`: comma-separated numeric Telegram user IDs allowed to update orders.
+- `TELEGRAM_CHAT_ID`: the Telegram chat where order notifications and admin actions are expected.
+
+After adding the variables, redeploy and register/update the webhook with Telegram's `secret_token` set to the same `TELEGRAM_WEBHOOK_SECRET`. The webhook URL is `https://<production-domain>/api/telegram-webhook`. Do not put the bot token or webhook secret in source code or share them.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
