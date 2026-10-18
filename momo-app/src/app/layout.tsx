@@ -47,8 +47,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <CartProvider>
           <SplashScreen>
             {children}
-            <PwaRegister />
           </SplashScreen>
+          <PwaRegister />
         </CartProvider>
       </body>
     </html>
