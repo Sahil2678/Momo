@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Fresh RK MOMO Wholesale & Retail Ordering Platform",
     start_url: "/",
     display: "standalone",
-    background_color: "#09090b",
+    background_color: "#0e0a08",
     theme_color: "#f59e0b",
     orientation: "portrait",
     icons: [
@@ -18,13 +18,13 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: "any",
       },
       {
-        src: "/icon-512.png",
+        src: "/icon-152.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icon-512.png",
+        src: "/icon-152.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
