@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-
+import { SplashScreen } from "@/components/SplashScreen";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "",
@@ -16,18 +16,6 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: "192x192",
         type: "image/png",
         purpose: "any",
-      },
-      {
-        src: "/icon-512.png",
-        sizes: "512x512",
-        type: "image/png",
-        purpose: "any",
-      },
-      {
-        src: "/icon-512.png",
-        sizes: "512x512",
-        type: "image/png",
-        purpose: "maskable",
       },
     ],
   };

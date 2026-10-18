@@ -4,7 +4,6 @@ import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import { PwaRegister } from "@/components/PwaRegister";
 import { SplashScreen } from "@/components/SplashScreen";
-
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -16,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#0e0a08", // Updated theme color matching your dark espresso/charcoal theme
+  themeColor: "#09090b",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
