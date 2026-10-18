@@ -224,7 +224,7 @@ export default function MomoHomePage() {
                     priority
                     className="object-cover"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-black/10 to-transparent" />
                   <div className="absolute bottom-4 left-4 right-4 sm:bottom-5 sm:left-5 sm:right-5">
                     <div className="flex items-center gap-2 mb-[180px] sm:mb-[-10px]">
                       <span className="rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[15px] sm:text-[20px] font-semibold text-emerald-400">
