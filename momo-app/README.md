@@ -34,7 +34,15 @@ The Telegram webhook rejects requests unless these server-side Vercel Production
 - `TELEGRAM_ADMIN_IDS`: comma-separated numeric Telegram user IDs allowed to update orders.
 - `TELEGRAM_CHAT_ID`: the Telegram chat where order notifications and admin actions are expected.
 
-After adding the variables, redeploy and register/update the webhook with Telegram's `secret_token` set to exactly the same `TELEGRAM_WEBHOOK_SECRET`. A webhook registered with only the URL will be rejected, and the inline buttons will not work. For example:
+### Easy 1-Click Telegram Webhook Setup (Recommended)
+
+Once deployed to Vercel, simply open this URL in your web browser:
+```
+https://<your-production-domain>/api/telegram-webhook?setup=1
+```
+This automatically registers the webhook with Telegram Bot API, syncs your `TELEGRAM_WEBHOOK_SECRET`, and enables button callback handling immediately with zero command line needed!
+
+### Manual Setup via curl (Alternative)
 
 ```bash
 curl -X POST "https://api.telegram.org/bot<TELEGRAM_TOKEN>/setWebhook" \
@@ -42,7 +50,7 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_TOKEN>/setWebhook" \
   -d '{"url":"https://<production-domain>/api/telegram-webhook","secret_token":"<same TELEGRAM_WEBHOOK_SECRET value>"}'
 ```
 
-Set the URL to your stable production domain. Also make sure `TELEGRAM_ADMIN_IDS` contains the numeric Telegram user ID of the person pressing the buttons, and `TELEGRAM_CHAT_ID` matches the chat receiving the order notifications. Re-register the webhook only when its URL or secret changes. Do not put the bot token or webhook secret in source code or share them.
+To verify the webhook status at any time, visit `https://<your-production-domain>/api/telegram-webhook`.
 
 ## Learn More
 

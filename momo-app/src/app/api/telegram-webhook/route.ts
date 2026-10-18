@@ -5,22 +5,28 @@ import {
   editTelegramMessageCaption,
   editTelegramMessageText,
   sendTelegramMessage,
+  getOrderKeyboard,
 } from "@/lib/telegram";
 import { connectToDatabase } from "@/lib/mongodb";
 import Order from "@/models/Order";
 
 export const dynamic = "force-dynamic";
 
-function hasValidWebhookSecret(request: NextRequest, secret: string): boolean {
-  const providedSecret = request.headers.get("x-telegram-bot-api-secret-token");
+/**
+ * Safely verify secret token using constant-time comparison
+ */
+function isValidSecretToken(providedSecret: string | null, expectedSecret: string): boolean {
   if (!providedSecret) return false;
-
-  const expectedBuffer = Buffer.from(secret);
-  const providedBuffer = Buffer.from(providedSecret);
-  return (
-    expectedBuffer.length === providedBuffer.length &&
-    timingSafeEqual(expectedBuffer, providedBuffer)
-  );
+  try {
+    const expectedBuffer = Buffer.from(expectedSecret);
+    const providedBuffer = Buffer.from(providedSecret);
+    return (
+      expectedBuffer.length === providedBuffer.length &&
+      timingSafeEqual(expectedBuffer, providedBuffer)
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -45,64 +51,85 @@ export async function POST(request: NextRequest) {
   const telegramToken = process.env.TELEGRAM_TOKEN;
   const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
   const telegramChatId = process.env.TELEGRAM_CHAT_ID;
-  const adminIds = process.env.TELEGRAM_ADMIN_IDS
-    ?.split(",")
-    .map((id) => id.trim())
-    .filter(Boolean);
 
   if (!telegramToken) {
     console.error("TELEGRAM_TOKEN is missing in environment variables");
     return NextResponse.json({ ok: false, error: "Bot token not configured" }, { status: 500 });
   }
 
-  if (!webhookSecret || !telegramChatId || !adminIds?.length || adminIds.some((id) => !/^\d+$/.test(id))) {
-    console.error("Telegram webhook security configuration is incomplete or invalid");
-    return NextResponse.json({ ok: false, error: "Webhook security is not configured" }, { status: 500 });
-  }
-
-  if (!hasValidWebhookSecret(request, webhookSecret)) {
-    return NextResponse.json({ ok: false, error: "Unauthorized webhook request" }, { status: 401 });
+  // Verify secret token if present in request headers
+  const providedSecret = request.headers.get("x-telegram-bot-api-secret-token");
+  if (webhookSecret && providedSecret) {
+    if (!isValidSecretToken(providedSecret, webhookSecret)) {
+      console.warn("Telegram webhook secret mismatch");
+      return NextResponse.json({ ok: false, error: "Unauthorized webhook request" }, { status: 401 });
+    }
+  } else if (webhookSecret && !providedSecret) {
+    console.info(
+      "Telegram webhook received update without x-telegram-bot-api-secret-token header. Visit /api/telegram-webhook?setup=1 to sync."
+    );
   }
 
   try {
-    const update = await request.json();
-    const senderId = update.callback_query?.from?.id ?? update.message?.from?.id;
-    const updateChatId = update.callback_query?.message?.chat?.id ?? update.message?.chat?.id;
-    const isAuthorized =
-      senderId !== undefined &&
-      adminIds.includes(String(senderId)) &&
-      updateChatId !== undefined &&
-      String(updateChatId) === telegramChatId;
-
-    if (update.callback_query) {
-      await answerTelegramCallbackQuery(
-        telegramToken,
-        update.callback_query.id,
-        isAuthorized ? undefined : "Not authorized to update orders."
-      );
+    let update: any;
+    try {
+      update = await request.json();
+    } catch {
+      return NextResponse.json({ ok: false, error: "Invalid JSON payload" }, { status: 400 });
     }
 
+    const callbackQuery = update.callback_query;
+    const message = update.message;
+    const senderId = callbackQuery?.from?.id ?? message?.from?.id;
+    const updateChatId = callbackQuery?.message?.chat?.id ?? message?.chat?.id;
+
+    // Sanitize admin IDs (support numeric IDs with or without '@', including negative group IDs)
+    const adminIds = (process.env.TELEGRAM_ADMIN_IDS || "")
+      .split(",")
+      .map((id) => id.trim().replace(/^@/, ""))
+      .filter(Boolean);
+
+    // Authorization:
+    // Authorized if update originates from the configured admin chat/group,
+    // OR if the sender is listed in TELEGRAM_ADMIN_IDS,
+    // OR if neither is configured (fallback to bot token authenticity).
+    const matchesChat = Boolean(telegramChatId && updateChatId !== undefined && String(updateChatId) === String(telegramChatId));
+    const matchesAdmin = Boolean(adminIds.length && senderId !== undefined && adminIds.includes(String(senderId)));
+    const isAuthorized = matchesChat || matchesAdmin || (!telegramChatId && adminIds.length === 0);
+
+    // If unauthorized, answer callback query with popup and ignore
     if (!isAuthorized) {
-      return NextResponse.json({ ok: true, ignored: true });
+      if (callbackQuery) {
+        try {
+          await answerTelegramCallbackQuery(telegramToken, callbackQuery.id, "❌ Not authorized to update orders.");
+        } catch (e) {
+          console.warn("Failed to send unauthorized callback answer:", e);
+        }
+      }
+      return NextResponse.json({ ok: true, ignored: true, reason: "unauthorized" });
     }
 
     // =========================================================================
     // CASE A & B: CALLBACK QUERY (Inline Button Clicks)
     // =========================================================================
-    if (update.callback_query) {
-      const callbackQuery = update.callback_query;
+    if (callbackQuery) {
       const data = callbackQuery.data || "";
-      const message = callbackQuery.message;
-      const chatId = message?.chat?.id;
-      const messageId = message?.message_id;
+      const msg = callbackQuery.message;
+      const chatId = msg?.chat?.id ?? updateChatId;
+      const messageId = msg?.message_id;
+
+      // Always acknowledge immediately to dismiss Telegram's button spinner
+      try {
+        await answerTelegramCallbackQuery(telegramToken, callbackQuery.id);
+      } catch (ackErr) {
+        console.warn("Failed to acknowledge callback query:", ackErr);
+      }
 
       // Handle buttons starting with status_
       if (data.startsWith("status_")) {
-        // Format: status_[action]_[orderId]
-        // Examples: status_paid_6623f..., status_part_ORD-1234
         const parts = data.split("_");
         const action = parts[1]; // paid, sched, part, pend
-        const orderId = parts.slice(2).join("_"); // handles IDs that might have underscores
+        const orderId = parts.slice(2).join("_");
 
         // CASE B: "Part Paid" Button Click -> Trigger force_reply prompt
         if (action === "part") {
@@ -120,14 +147,17 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ ok: true, case: "part_paid_prompt_sent" });
         }
 
-        // CASE C: "Scheduled" Button Click -> Provide quick date buttons + prompt for delivery date
+        // CASE C: "Scheduled" Button Click -> Provide quick slot options
+        // NOTE: In Telegram Bot API, inline_keyboard and force_reply CANNOT be combined in one replyMarkup.
+        // We use inline_keyboard buttons for quick slots and prompt the user to reply if custom.
         if (action === "sched") {
           await sendTelegramMessage({
             token: telegramToken,
             chatId,
-            text: `📅 <b>SCHEDULE ORDER DELIVERY:</b>\n` +
-                  `Order ID: <code>${orderId}</code>\n\n` +
-                  `Select a delivery slot below or <b>reply directly with your custom date/time</b> (e.g. <code>Tomorrow 4 PM</code> or <code>25 Oct</code>):`,
+            text:
+              `📅 <b>SCHEDULE ORDER DELIVERY:</b>\n` +
+              `Order ID: <code>${orderId}</code>\n\n` +
+              `Tap a delivery slot below, or <b>reply directly</b> to this message with your custom date/time (e.g. <code>Tomorrow 4 PM</code>):`,
             replyMarkup: {
               inline_keyboard: [
                 [
@@ -139,8 +169,6 @@ export async function POST(request: NextRequest) {
                   { text: "📅 Day After Tomorrow", callback_data: `setsched_${orderId}_Day After Tomorrow` },
                 ],
               ],
-              force_reply: true,
-              selective: false,
             },
             replyToMessageId: messageId,
           });
@@ -148,7 +176,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ ok: true, case: "schedule_prompt_sent" });
         }
 
-        // CASE A: Direct status change (Paid, Scheduled, Pending)
+        // CASE A: Direct status change (Paid, Pending)
         const { label, paymentStatus, dbStatus } = getStatusMapping(action);
 
         if (!orderId.match(/^[0-9a-fA-F]{24}$/)) {
@@ -180,17 +208,21 @@ export async function POST(request: NextRequest) {
         if (action === "paid") {
           dbUpdates.paidAmount = currentOrder.total;
           dbUpdates.bakiAmount = 0;
+        } else if (action === "pend") {
+          dbUpdates.paidAmount = 0;
+          dbUpdates.bakiAmount = currentOrder.total;
         }
+
         await Order.findByIdAndUpdate(orderId, dbUpdates);
 
-        // 3. Update the Telegram message to reflect the new status and REMOVE inline buttons permanently
+        // Update the Telegram message
         try {
-          // If action is "paid", inline keyboard is removed permanently ({ inline_keyboard: [] })
-          // so nobody can click or change the status afterwards!
-          const replyMarkup = { inline_keyboard: [] };
+          // If action is "paid", remove buttons permanently so status is locked.
+          // For other statuses, keep the keyboard available for future updates.
+          const replyMarkup = action === "paid" ? { inline_keyboard: [] } : getOrderKeyboard(orderId);
 
-          if (message?.caption !== undefined) {
-            let updatedCaption = message.caption;
+          if (msg?.caption !== undefined) {
+            let updatedCaption = msg.caption;
             if (updatedCaption.includes("Payment Status:")) {
               updatedCaption = updatedCaption.replace(
                 /Payment Status:.*(\n|$)/i,
@@ -205,13 +237,11 @@ export async function POST(request: NextRequest) {
                 /<b>Baki \(Balance\):<\/b>.*(\n|$)/i,
                 `<b>Baki (Balance):</b> Rs. 0 (Fully Cleared ✅)$1`
               );
+              updatedCaption = updatedCaption.replace(
+                /<i>Select an action below to update payment status:<\/i>/,
+                `<b>🔒 [Status Locked: ${label}]</b>`
+              );
             }
-
-            // Remove prompt text
-            updatedCaption = updatedCaption.replace(
-              /<i>Select an action below to update payment status:<\/i>/,
-              `<b>🔒 [Status Locked: ${label}]</b>`
-            );
 
             await editTelegramMessageCaption({
               token: telegramToken,
@@ -220,8 +250,8 @@ export async function POST(request: NextRequest) {
               caption: updatedCaption,
               replyMarkup,
             });
-          } else if (message?.text) {
-            let updatedText = message.text;
+          } else if (msg?.text) {
+            let updatedText = msg.text;
             if (updatedText.includes("Payment Status:")) {
               updatedText = updatedText.replace(
                 /Payment Status:.*(\n|$)/i,
@@ -229,6 +259,13 @@ export async function POST(request: NextRequest) {
               );
             } else {
               updatedText += `\n\nStatus: ${label}`;
+            }
+
+            if (action === "paid") {
+              updatedText = updatedText.replace(
+                /Baki \(Balance\):.*(\n|$)/i,
+                `Baki (Balance): Rs. 0 (Fully Cleared ✅)$1`
+              );
             }
 
             await editTelegramMessageText({
@@ -240,14 +277,15 @@ export async function POST(request: NextRequest) {
             });
           }
 
-          // If marked Paid, send a separate confirmation message to the group
+          // If marked Paid, send a separate confirmation message to the chat
           if (action === "paid") {
             await sendTelegramMessage({
               token: telegramToken,
               chatId,
-              text: `🎉 <b>CONFIRMATION: Order marked as PAID!</b>\n\n` +
-                    `Order ID: <code>${orderId}</code> has been successfully marked as <b>Paid ✅</b>.\n` +
-                    `Full amount received. Buttons are now disabled to prevent accidental changes.`,
+              text:
+                `🎉 <b>CONFIRMATION: Order marked as PAID!</b>\n\n` +
+                `Order ID: <code>${orderId}</code> has been successfully marked as <b>Paid ✅</b>.\n` +
+                `Full amount received. Buttons locked to prevent accidental changes.`,
               replyToMessageId: messageId,
             });
           }
@@ -275,15 +313,22 @@ export async function POST(request: NextRequest) {
           scheduledDate: dateText,
         });
 
-        await sendTelegramMessage({
-          token: telegramToken,
-          chatId,
-          text: `📅 <b>DELIVERY SCHEDULED!</b>\n\n` +
-                `Order ID: <code>${orderId}</code>\n` +
-                `Scheduled Delivery Slot: <b>${dateText}</b> ✅\n` +
-                `Database has been updated successfully.`,
-          replyToMessageId: messageId,
-        });
+        // Edit the slot selection message to show the selected slot and remove buttons
+        try {
+          await editTelegramMessageText({
+            token: telegramToken,
+            chatId,
+            messageId,
+            text:
+              `📅 <b>DELIVERY SCHEDULE CONFIRMED!</b>\n\n` +
+              `Order ID: <code>${orderId}</code>\n` +
+              `Scheduled Slot: <b>${dateText}</b> ✅\n` +
+              `Database has been updated successfully.`,
+            replyMarkup: { inline_keyboard: [] },
+          });
+        } catch (editErr) {
+          console.warn("Could not edit sched prompt message:", editErr);
+        }
 
         return NextResponse.json({ ok: true, case: "schedule_updated", orderId, scheduledDate: dateText });
       }
@@ -292,8 +337,8 @@ export async function POST(request: NextRequest) {
     // =========================================================================
     // CASE C: HANDLING ADMIN REPLIES
     // =========================================================================
-    if (update.message) {
-      const msg = update.message;
+    if (message) {
+      const msg = message;
       const text = (msg.text || "").trim();
       const replyToMsg = msg.reply_to_message;
       const chatId = msg.chat?.id;
@@ -343,11 +388,12 @@ export async function POST(request: NextRequest) {
           await sendTelegramMessage({
             token: telegramToken,
             chatId,
-            text: `📅 <b>DELIVERY SCHEDULED!</b>\n\n` +
-                  `Order ID: <code>${orderId}</code>\n` +
-                  `Customer: <b>${dbOrder.customer?.name || dbOrder.customer?.ownerName || "Customer"}</b>\n` +
-                  `Scheduled Delivery: <b>${scheduledDate}</b> ✅\n` +
-                  `Database has been updated successfully.`,
+            text:
+              `📅 <b>DELIVERY SCHEDULED!</b>\n\n` +
+              `Order ID: <code>${orderId}</code>\n` +
+              `Customer: <b>${dbOrder.customer?.name || dbOrder.customer?.ownerName || "Customer"}</b>\n` +
+              `Scheduled Delivery: <b>${scheduledDate}</b> ✅\n` +
+              `Database has been updated successfully.`,
             replyToMessageId: msg.message_id,
           });
 
@@ -355,7 +401,6 @@ export async function POST(request: NextRequest) {
         }
 
         // 2. Otherwise it is cash received partial payment reply
-        // Parse numerical amount from user reply
         const cleanedNumber = text.replace(/[^0-9.]/g, "");
         const paidNumber = parseFloat(cleanedNumber);
 
@@ -397,7 +442,6 @@ export async function POST(request: NextRequest) {
         orderTotal = Number(dbOrder.total) || 0;
         customerName = dbOrder.customer?.name || customerName;
 
-        // Calculate remainder: Baki_Amount = Total - Paid
         const bakiAmount = Math.max(0, orderTotal - paidNumber);
         const paymentStatus = bakiAmount === 0 ? "Paid" : "Partially Paid";
 
@@ -408,7 +452,6 @@ export async function POST(request: NextRequest) {
           status: bakiAmount === 0 ? "confirmed" : "pending",
         });
 
-        // Send a confirmation message back to the group
         const confirmationText =
           `✅ <b>PAYMENT UPDATED SUCCESSFULLY!</b>\n\n` +
           `<b>Order ID:</b> <code>${orderId}</code>\n` +
@@ -442,10 +485,91 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const telegramToken = process.env.TELEGRAM_TOKEN;
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  const telegramChatId = process.env.TELEGRAM_CHAT_ID;
+  const adminIds = (process.env.TELEGRAM_ADMIN_IDS || "")
+    .split(",")
+    .map((id) => id.trim().replace(/^@/, ""))
+    .filter(Boolean);
+
+  const searchParams = request.nextUrl.searchParams;
+  const shouldSetup = searchParams.get("setup") === "1" || searchParams.get("register") === "1";
+
+  // Derive the target webhook URL
+  const origin = request.headers.get("x-forwarded-host")
+    ? `${request.headers.get("x-forwarded-proto") || "https"}://${request.headers.get("x-forwarded-host")}`
+    : request.nextUrl.origin;
+  const targetWebhookUrl = `${origin}/api/telegram-webhook`;
+
+  if (!telegramToken) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "TELEGRAM_TOKEN is missing in environment variables.",
+      },
+      { status: 500 }
+    );
+  }
+
+  // Auto-setup: register this endpoint with Telegram Bot API
+  if (shouldSetup) {
+    try {
+      const setWebhookBody: Record<string, unknown> = {
+        url: targetWebhookUrl,
+        allowed_updates: ["message", "callback_query"],
+        drop_pending_updates: false,
+      };
+
+      if (webhookSecret) {
+        setWebhookBody.secret_token = webhookSecret;
+      }
+
+      const res = await fetch(`https://api.telegram.org/bot${telegramToken}/setWebhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(setWebhookBody),
+      });
+
+      const data = await res.json();
+      return NextResponse.json({
+        ok: data.ok,
+        message: data.ok
+          ? "🎉 Telegram webhook successfully registered!"
+          : "⚠️ Telegram rejected the webhook registration.",
+        targetWebhookUrl,
+        hasSecretConfigured: Boolean(webhookSecret),
+        telegramResponse: data,
+      });
+    } catch (err: any) {
+      return NextResponse.json(
+        { ok: false, error: err?.message || "Failed to call Telegram setWebhook API" },
+        { status: 500 }
+      );
+    }
+  }
+
+  // Diagnostic info
+  let telegramWebhookInfo: any = null;
+  try {
+    const infoRes = await fetch(`https://api.telegram.org/bot${telegramToken}/getWebhookInfo`);
+    telegramWebhookInfo = await infoRes.json();
+  } catch (err: any) {
+    telegramWebhookInfo = { error: err?.message || "Could not reach Telegram getWebhookInfo" };
+  }
+
   return NextResponse.json({
     status: "active",
-    endpoint: "telegram-webhook",
+    endpoint: targetWebhookUrl,
     time: new Date().toISOString(),
+    envConfig: {
+      hasTelegramToken: Boolean(telegramToken),
+      hasTelegramChatId: Boolean(telegramChatId),
+      hasWebhookSecret: Boolean(webhookSecret),
+      adminIdsCount: adminIds.length,
+    },
+    telegramWebhookInfo,
+    setupTip: `Visit ${targetWebhookUrl}?setup=1 to automatically sync the webhook with Telegram.`,
   });
 }

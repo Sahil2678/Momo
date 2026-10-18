@@ -50,11 +50,8 @@ export async function generateReceiptPDF(data: ReceiptData): Promise<Buffer> {
       doc.text("", 300, startY);
       doc.font("Helvetica-Bold").text("Customer Information:");
       doc.font("Helvetica");
-      const cleanCustomerName = normalizeSpecialFont(data.customerName);
-      const printableName = cleanCustomerName && cleanCustomerName !== data.customerName
-        ? `${data.customerName} (${cleanCustomerName})`
-        : data.customerName;
-      doc.text(`Name: ${printableName}`);
+      const cleanCustomerName = normalizeSpecialFont(data.customerName) || data.customerName;
+      doc.text(`Name: ${cleanCustomerName}`);
       doc.text(`Phone: ${data.phone}`);
       if (data.address) {
         doc.text(`Address: ${data.address}`);
