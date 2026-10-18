@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import Momo from "@/models/Momo";
+import { verifyAdminSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +19,14 @@ export async function GET() {
   }
 }
 
-// POST — create a new momo
+// POST — create a new momo (Protected)
 export async function POST(request: NextRequest) {
   try {
+    const isAdmin = await verifyAdminSession(request);
+    if (!isAdmin) {
+      return NextResponse.json({ success: false, error: "Unauthorized access" }, { status: 401 });
+    }
+
     const body = await request.json();
     const {
       id, name, tagline, description, price, wholesalePricePerPiece, pieces,

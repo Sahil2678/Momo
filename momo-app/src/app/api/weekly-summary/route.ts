@@ -7,19 +7,22 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    // 1. Security check: Verify CRON_SECRET against Authorization header or ?secret= query param
+    // 1. Security check: Verify CRON_SECRET or valid admin session
     const authHeader = request.headers.get("authorization");
     const { searchParams } = new URL(request.url);
     const secretParam = searchParams.get("secret");
-
     const cronSecret = process.env.CRON_SECRET;
 
-    if (cronSecret) {
-      const isValidBearer = authHeader === `Bearer ${cronSecret}`;
-      const isValidParam = secretParam === cronSecret;
+    const isValidCron = Boolean(
+      cronSecret &&
+      ((authHeader && authHeader === `Bearer ${cronSecret}`) || secretParam === cronSecret)
+    );
 
-      if (!isValidBearer && !isValidParam) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!isValidCron) {
+      const { verifyAdminSession } = await import("@/lib/auth");
+      const isAdmin = await verifyAdminSession(request);
+      if (!isAdmin) {
+        return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
       }
     }
 

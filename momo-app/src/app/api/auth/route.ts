@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +38,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (username !== validUser || password !== validPass) {
+    const userBuf = Buffer.from(String(username || ""));
+    const validUserBuf = Buffer.from(validUser);
+    const passBuf = Buffer.from(String(password || ""));
+    const validPassBuf = Buffer.from(validPass);
+
+    const isUserMatch = userBuf.length === validUserBuf.length && timingSafeEqual(userBuf, validUserBuf);
+    const isPassMatch = passBuf.length === validPassBuf.length && timingSafeEqual(passBuf, validPassBuf);
+
+    if (!isUserMatch || !isPassMatch) {
       // Deliberate delay to slow brute-force
       await new Promise((r) => setTimeout(r, 600));
       return NextResponse.json(

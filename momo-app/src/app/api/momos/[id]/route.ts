@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import Momo from "@/models/Momo";
+import { verifyAdminSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-// PUT — update a momo by its custom `id` field
+// PUT — update a momo by its custom `id` field (Protected)
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const isAdmin = await verifyAdminSession(request);
+    if (!isAdmin) {
+      return NextResponse.json({ success: false, error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await request.json();
 
@@ -35,12 +41,17 @@ export async function PUT(
   }
 }
 
-// DELETE — remove a momo by its custom `id` field
+// DELETE — remove a momo by its custom `id` field (Protected)
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const isAdmin = await verifyAdminSession(request);
+    if (!isAdmin) {
+      return NextResponse.json({ success: false, error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { id } = await params;
 
     await connectToDatabase();

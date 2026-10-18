@@ -66,15 +66,30 @@ export async function POST(request: NextRequest) {
 
     const orderType = totalPieces >= 500 ? "bulk" : "retail";
 
-    // Validate quantities & prices
+    // Validate quantities & prices strictly to prevent tampering
     for (const item of items) {
-      if (!item.name || typeof item.price !== "number" || typeof item.quantity !== "number" || item.quantity < 1) {
+      if (
+        !item.name ||
+        typeof item.price !== "number" ||
+        item.price <= 0 ||
+        isNaN(item.price) ||
+        typeof item.quantity !== "number" ||
+        item.quantity < 1 ||
+        isNaN(item.quantity)
+      ) {
         return NextResponse.json(
-          { success: false, error: "Invalid item data in order." },
+          { success: false, error: "Invalid item price or quantity in order." },
           { status: 400 }
         );
       }
     }
+
+    const safeDeliveryFee = Math.max(0, Number(deliveryFee) || 0);
+    const calculatedSubtotal = items.reduce(
+      (sum: number, it: any) => sum + Number(it.price) * Number(it.quantity),
+      0
+    );
+    const calculatedTotal = calculatedSubtotal + safeDeliveryFee;
 
     // 1. Create order in MongoDB (Local/Persistent Next.js DB)
     let newOrder: any = null;
@@ -91,11 +106,11 @@ export async function POST(request: NextRequest) {
         items,
         totalPieces,
         orderType,
-        subtotal: Number(subtotal),
-        deliveryFee: Number(deliveryFee),
-        total: Number(total),
+        subtotal: calculatedSubtotal,
+        deliveryFee: safeDeliveryFee,
+        total: calculatedTotal,
         paidAmount: 0,
-        bakiAmount: Number(total),
+        bakiAmount: calculatedTotal,
         paymentStatus: "Pending",
         status: "pending",
       });

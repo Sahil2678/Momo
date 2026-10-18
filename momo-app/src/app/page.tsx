@@ -48,10 +48,10 @@ export default function MomoHomePage() {
       {/* Top Sticky Announcement Banner */}
       <OfferBanner onOpenOffer={() => setIsOfferModalOpen(true)} />
 
-      {/* Background ambient glow effect */}
+      {/* Background ambient glow effect (GPU-accelerated for smooth mobile scrolling) */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 h-[500px] w-[900px] rounded-full bg-gradient-to-tr from-amber-600/15 via-orange-600/15 to-transparent blur-[140px]" />
-        <div className="absolute top-[40%] right-[-10%] h-[400px] w-[500px] rounded-full bg-amber-500/10 blur-[130px]" />
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 h-[350px] sm:h-[500px] w-[500px] sm:w-[900px] rounded-full bg-gradient-to-tr from-amber-600/15 via-orange-600/15 to-transparent blur-[70px] sm:blur-[140px] transform-gpu will-change-transform" />
+        <div className="absolute top-[40%] right-[-10%] h-[300px] sm:h-[400px] w-[350px] sm:w-[500px] rounded-full bg-amber-500/10 blur-[60px] sm:blur-[130px] transform-gpu will-change-transform" />
       </div>
 
       {/* Floating Modern Header */}
