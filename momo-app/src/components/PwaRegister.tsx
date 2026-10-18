@@ -13,6 +13,10 @@ export function PwaRegister() {
   const [showBanner, setShowBanner] = useState(false);
 
   useEffect(() => {
+    const isInstalled =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      ("standalone" in navigator && Boolean(navigator.standalone));
+
     // 1. Register Service Worker with Auto-Update Detection
     if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
       navigator.serviceWorker
@@ -39,6 +43,7 @@ export function PwaRegister() {
     // 2. Listen for Install Prompt event
     const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
+      if (isInstalled) return;
       setInstallPrompt(e as BeforeInstallPromptEvent);
       // Only show banner if not dismissed previously
       if (!sessionStorage.getItem("pwa_prompt_dismissed")) {
@@ -46,21 +51,26 @@ export function PwaRegister() {
       }
     };
 
+    const handleAppInstalled = () => {
+      setInstallPrompt(null);
+      setShowBanner(false);
+    };
+
     window.addEventListener("beforeinstallprompt", handleBeforeInstall);
+    window.addEventListener("appinstalled", handleAppInstalled);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+      window.removeEventListener("appinstalled", handleAppInstalled);
     };
   }, []);
 
   const handleInstallClick = async () => {
     if (!installPrompt) return;
     await installPrompt.prompt();
-    const choice = await installPrompt.userChoice;
-    if (choice.outcome === "accepted") {
-      setShowBanner(false);
-      setInstallPrompt(null);
-    }
+    await installPrompt.userChoice;
+    setShowBanner(false);
+    setInstallPrompt(null);
   };
 
   const handleDismiss = () => {

@@ -15,26 +15,30 @@ const geistMono = Geist_Mono({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#09090b",
+  themeColor: "#0e0a08",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
 };
 
-// export const metadata: Metadata = {
-//   title: "RK MOMO — Readymade MOMO",
-//   description: "Order fresh, artisan steamed, crispy kurkure, and tandoori momos online with real-time checkout.",
-//   manifest: "/manifest.webmanifest",
-//   appleWebApp: {
-//     capable: true,
-//     statusBarStyle: "black-translucent",
-//     title: "RK MOMO",
-//   },
-//   icons: {
-//     icon: "/icon-192.png",
-//     apple: "/apple-icon.png",
-//   },
-// };
+export const metadata: Metadata = {
+  title: "RK MOMO — Readymade MOMO",
+  description: "Order fresh, handcrafted momos online from RK MOMO.",
+  manifest: "/manifest.webmanifest",
+  applicationName: "RK MOMO",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "RK MOMO",
+  },
+  icons: {
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/apple-icon.png",
+  },
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
