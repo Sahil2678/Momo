@@ -52,10 +52,7 @@ export function PwaRegister() {
       e.preventDefault();
       if (isInstalled) return;
       setInstallPrompt(e as BeforeInstallPromptEvent);
-      // Only show banner if not dismissed previously
-      if (!sessionStorage.getItem("pwa_prompt_dismissed")) {
-        setShowBanner(true);
-      }
+      setShowBanner(true);
     };
 
     const handleAppInstalled = () => {
@@ -97,7 +94,7 @@ export function PwaRegister() {
 
   const handleDismiss = () => {
     setShowBanner(false);
-    sessionStorage.setItem("pwa_prompt_dismissed", "true");
+    localStorage.setItem("pwa_install_pending", "true");
   };
 
   if (!showBanner) return null;
