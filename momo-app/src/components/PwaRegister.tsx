@@ -11,7 +11,7 @@ interface BeforeInstallPromptEvent extends Event {
 export function PwaRegister() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showBanner, setShowBanner] = useState(false);
-  const [showInstallHelp, setShowInstallHelp] = useState(false);
+  const [installDialogStep, setInstallDialogStep] = useState<"confirm" | "instructions" | null>(null);
 
   useEffect(() => {
     const isInstalled =
@@ -20,7 +20,7 @@ export function PwaRegister() {
 
     if (isInstalled) {
       localStorage.removeItem("pwa_install_pending");
-    } else if (localStorage.getItem("pwa_install_pending") === "true") {
+    } else {
       setShowBanner(true);
     }
 
@@ -59,7 +59,7 @@ export function PwaRegister() {
       localStorage.removeItem("pwa_install_pending");
       setInstallPrompt(null);
       setShowBanner(false);
-      setShowInstallHelp(false);
+      setInstallDialogStep(null);
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstall);
@@ -73,28 +73,43 @@ export function PwaRegister() {
 
   const handleInstallClick = async () => {
     if (!installPrompt) {
-      setShowInstallHelp(true);
+      setInstallDialogStep("confirm");
       return;
     }
 
-    localStorage.setItem("pwa_install_pending", "true");
-    await installPrompt.prompt();
-    const choice = await installPrompt.userChoice;
+    await promptForInstall(installPrompt);
+  };
+
+  const promptForInstall = async (promptEvent: BeforeInstallPromptEvent) => {
+    await promptEvent.prompt();
+    const choice = await promptEvent.userChoice;
     setInstallPrompt(null);
 
     if (choice.outcome === "accepted") {
       localStorage.removeItem("pwa_install_pending");
       setShowBanner(false);
+      setInstallDialogStep(null);
       return;
     }
 
-    localStorage.setItem("pwa_install_pending", "true");
     setShowBanner(true);
+  };
+
+  const handleConfirmInstall = async () => {
+    if (!installPrompt) {
+      setInstallDialogStep("instructions");
+      return;
+    }
+
+    await promptForInstall(installPrompt);
+  };
+
+  const closeInstallDialog = () => {
+    setInstallDialogStep(null);
   };
 
   const handleDismiss = () => {
     setShowBanner(false);
-    localStorage.setItem("pwa_install_pending", "true");
   };
 
   if (!showBanner) return null;
@@ -131,40 +146,66 @@ export function PwaRegister() {
         </div>
       </div>
 
-      {showInstallHelp && (
+      {installDialogStep && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
           role="presentation"
-          onClick={() => setShowInstallHelp(false)}
+          onClick={closeInstallDialog}
         >
           <section
             className="w-full max-w-sm rounded-2xl border border-amber-500/30 bg-zinc-950 p-5 text-white shadow-2xl"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="pwa-install-help-title"
+            aria-labelledby="pwa-install-dialog-title"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <h2 id="pwa-install-help-title" className="text-base font-bold">Install RK MOMO</h2>
+              <h2 id="pwa-install-dialog-title" className="text-base font-bold">
+                {installDialogStep === "confirm" ? "Install RK MOMO?" : "Install RK MOMO"}
+              </h2>
               <button
-                onClick={() => setShowInstallHelp(false)}
+                onClick={closeInstallDialog}
                 className="rounded-lg p-1.5 text-zinc-400 hover:text-white"
-                aria-label="Close install instructions"
+                aria-label="Close install dialog"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <p className="text-sm leading-relaxed text-zinc-300">
-              Browser ne install prompt band kar diya. Install karne ke liye browser menu
-              (⋮) kholen aur <strong className="text-white">Install app</strong> ya{" "}
-              <strong className="text-white">Add to Home screen</strong> chunein.
-            </p>
-            <button
-              onClick={() => setShowInstallHelp(false)}
-              className="mt-5 w-full rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-zinc-950 hover:bg-amber-400"
-            >
-              Got it
-            </button>
+            {installDialogStep === "confirm" ? (
+              <>
+                <p className="text-sm leading-relaxed text-zinc-300">
+                  RK MOMO app install karna chahte hain?
+                </p>
+                <div className="mt-5 flex justify-end gap-3">
+                  <button
+                    onClick={closeInstallDialog}
+                    className="rounded-xl border border-zinc-700 px-4 py-2.5 text-sm font-bold text-zinc-300 hover:bg-zinc-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmInstall}
+                    className="rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-zinc-950 hover:bg-amber-400"
+                  >
+                    Install
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm leading-relaxed text-zinc-300">
+                  Is browser mein direct install prompt available nahi hai. Install karne ke liye browser menu
+                  (⋮) kholen aur <strong className="text-white">Install app</strong> ya{" "}
+                  <strong className="text-white">Add to Home screen</strong> chunein.
+                </p>
+                <button
+                  onClick={closeInstallDialog}
+                  className="mt-5 w-full rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-zinc-950 hover:bg-amber-400"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
           </section>
         </div>
       )}
