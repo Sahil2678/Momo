@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "RK MOMO Wholesale & Retail",
-    short_name: "RK MOMO",
+    name: "",
+    short_name: "",
     description: "Fresh RK MOMO Wholesale & Retail Ordering Platform",
     start_url: "/",
     display: "standalone",

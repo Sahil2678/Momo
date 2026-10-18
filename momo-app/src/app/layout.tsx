@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import { PwaRegister } from "@/components/PwaRegister";
+import { SplashScreen } from "@/components/SplashScreen";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#09090b",
+  themeColor: "#0e0a08", // Updated theme color matching your dark espresso/charcoal theme
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -36,19 +37,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#070709] text-zinc-100 min-h-screen`}
-      >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0e0a08] text-zinc-100 min-h-screen`}>
         <CartProvider>
-          {children}
-          <PwaRegister />
+          <SplashScreen>
+            {children}
+            <PwaRegister />
+          </SplashScreen>
         </CartProvider>
       </body>
     </html>
