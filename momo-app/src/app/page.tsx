@@ -17,7 +17,50 @@ import {
   UtensilsCrossed,
   Loader2,
 } from "lucide-react";
+// 1. Typewriter ke liye Words Array
+const TYPEWRITER_WORDS = [
+  "Restaurants.",
+  "Home Kitchens.",
+  "Food Trucks.",
+  "Cloud Kitchens.",
+  "Event Caterers.",
+];
 
+// 2. Separate Typewriter Component
+function TypewriterText() {
+  const [currentWordIndex, setCurrentWordIndex] = useState(0);
+  const [currentText, setCurrentText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    const targetWord = TYPEWRITER_WORDS[currentWordIndex];
+    const typingSpeed = isDeleting ? 40 : 80;
+
+    const timeout = setTimeout(() => {
+      if (!isDeleting) {
+        setCurrentText(targetWord.substring(0, currentText.length + 1));
+        if (currentText === targetWord) {
+          setTimeout(() => setIsDeleting(true), 1500);
+        }
+      } else {
+        setCurrentText(targetWord.substring(0, currentText.length - 1));
+        if (currentText === "") {
+          setIsDeleting(false);
+          setCurrentWordIndex((prev) => (prev + 1) % TYPEWRITER_WORDS.length);
+        }
+      }
+    }, typingSpeed);
+
+    return () => clearTimeout(timeout);
+  }, [currentText, isDeleting, currentWordIndex]);
+
+  return (
+    <span className="relative inline-flex items-center text-yellow-600 min-w-[200px] sm:min-w-[360px]">
+      <span>{currentText || "\u00A0"}</span>
+      <span className="ml-1 inline-block h-[1em] w-[3px] bg-amber-400 animate-[pulse_0.8s_infinite]"></span>
+    </span>
+  );
+}
 const CATEGORIES = ["All", "Steamed", "Crispy Fried", "Tandoori & Grill", "Signature Specials"];
 
 export default function MomoHomePage() {
@@ -55,7 +98,7 @@ export default function MomoHomePage() {
       </div>
 
       {/* Floating Modern Header */}
-      <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#070709]/95 md:bg-[#070709]/60 md:backdrop-blur-xl transition-all">
+      <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#070709]/80 md:bg-[#070709]/10 md:backdrop-blur-xl transition-all">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-3.5 py-2.5 sm:px-6 sm:py-3.5 lg:px-8">
           {/* Brand Logo */}
           <div className="flex items-center gap-2.5 sm:gap-3">
@@ -103,10 +146,12 @@ export default function MomoHomePage() {
             <div className="space-y-4 sm:space-y-6 lg:col-span-7">
               <h1 className="text-3xl font-black tracking-tight text-white sm:text-6xl sm:leading-[1.1] leading-[1.15]">
                 Bulk Handcrafted <br />
-                <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 bg-clip-text text-transparent">
-                  Momo Supply
-                </span>{" "}
-                for Restaurants.
+                <span className="inline-block bg-gradient-to-r from-[#B21807] via-red-600 to-orange-600 text-white rounded-lg px-3 py-1 my-1 -rotate-1 shadow-md align-baseline">
+  Momo
+</span>{" "}
+                Supply
+                for <br className="sm:hidden" />
+<TypewriterText />
               </h1>
 
               <p className="max-w-xl text-xs sm:text-lg text-zinc-400 sm:leading-relaxed leading-relaxed">
@@ -173,7 +218,7 @@ export default function MomoHomePage() {
               <div className="relative mx-auto max-w-md overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/10 to-transparent p-2.5 sm:p-3 shadow-2xl backdrop-blur-2xl">
                 <div className="relative h-60 sm:h-96 w-full overflow-hidden rounded-2xl">
                   <Image
-                    src="https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&w=1200&q=80"
+                    src="/main.png"
                     alt="Artisan Steamed Momos"
                     fill
                     priority
@@ -181,13 +226,11 @@ export default function MomoHomePage() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
                   <div className="absolute bottom-4 left-4 right-4 sm:bottom-5 sm:left-5 sm:right-5">
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[10px] sm:text-xs font-semibold text-emerald-400">
-                        Best Seller
+                    <div className="flex items-center gap-2 mb-[180px] sm:mb-[-10px]">
+                      <span className="rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[15px] sm:text-[20px] font-semibold text-emerald-400">
+                         Best Seller
                       </span>
-                    </div>
-                    <h3 className="mt-1.5 text-lg sm:text-xl font-bold text-white">Mountain Herb Veg Steam</h3>
-                    <p className="text-[11px] sm:text-xs text-zinc-300">Wholesale pack • 8 pcs / pack • ₹2.75 / piece</p>
+                    </div>         
                   </div>
                 </div>
               </div>
@@ -261,7 +304,7 @@ export default function MomoHomePage() {
           </div>
           <div className="flex items-center gap-6 text-xs text-zinc-400">
             <span className="flex items-center gap-1.5">
-              <PhoneCall className="h-3.5 w-3.5 text-amber-400" /> +91 99887 76655
+              <PhoneCall className="h-3.5 w-3.5 text-amber-400" /> +91 1234567890
             </span>
             <span className="flex items-center gap-1.5">
               <MapPin className="h-3.5 w-3.5 text-amber-400" /> CHAPRA, SARAN BIHAR

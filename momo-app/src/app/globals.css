@@ -60,3 +60,64 @@ textarea:-webkit-autofill:focus {
 input, textarea {
   font-family: var(--font-geist-sans), "Segoe UI Symbol", "Apple Color Emoji", "Segoe UI Emoji", "Noto Sans", system-ui, sans-serif;
 }
+
+
+
+
+
+@keyframes typewriterEffect {
+  /* Word 1: Restaurants. */
+  0% { width: 0; content: "Restaurants."; }
+  3%, 9% { width: 100%; content: "Restaurants."; }
+  12% { width: 0; content: "Restaurants."; }
+
+  /* Word 2: Home Kitchens. */
+  14% { width: 0; content: "Home Kitchens."; }
+  17%, 23% { width: 100%; content: "Home Kitchens."; }
+  26% { width: 0; content: "Home Kitchens."; }
+
+  /* Word 3: Cafes & Bars. */
+  28% { width: 0; content: "Cafes & Bars."; }
+  31%, 37% { width: 100%; content: "Cafes & Bars."; }
+  40% { width: 0; content: "Cafes & Bars."; }
+
+  /* Word 4: Food Trucks. */
+  42% { width: 0; content: "Food Trucks."; }
+  45%, 51% { width: 100%; content: "Food Trucks."; }
+  54% { width: 0; content: "Food Trucks."; }
+
+  /* Word 5: Cloud Kitchens. */
+  56% { width: 0; content: "Cloud Kitchens."; }
+  59%, 65% { width: 100%; content: "Cloud Kitchens."; }
+  68% { width: 0; content: "Cloud Kitchens."; }
+
+  /* Word 6: Fine Dining. */
+  70% { width: 0; content: "Fine Dining."; }
+  73%, 79% { width: 100%; content: "Fine Dining."; }
+  82% { width: 0; content: "Fine Dining."; }
+
+  /* Word 7: Event Caterers. */
+  84% { width: 0; content: "Event Caterers."; }
+  87%, 93% { width: 100%; content: "Event Caterers."; }
+  96%, 100% { width: 0; content: "Event Caterers."; }
+}
+
+@keyframes cursorBlink {
+  50% { border-color: transparent; }
+}
+
+/* Dynamic Typewriter Class */
+.typewriter-text {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 4px solid #fbbf24; /* amber-400 color */
+  animation: cursorBlink 0.75s step-end infinite;
+}
+
+.typewriter-text::after {
+  content: "Restaurants.";
+  animation: typewriterEffect 24s infinite;
+}
+
+

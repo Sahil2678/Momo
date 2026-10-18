@@ -22,7 +22,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "RK MOMO — Handcrafted Himalayan Dumplings",
+  title: "RK MOMO — Handcrafted MOMO",
   description: "Order fresh, artisan steamed, crispy kurkure, and tandoori momos online with real-time checkout.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
