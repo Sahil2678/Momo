@@ -3,11 +3,17 @@
  * Fetches the PDF as a Blob and triggers an in-page download
  * without navigating away or causing a white screen in standalone PWA mode.
  */
-export async function downloadReceipt(orderId: string): Promise<boolean> {
+export async function downloadReceipt(
+  orderId: string,
+  options: { dashboardPaidOnly?: boolean } = {}
+): Promise<boolean> {
+  const query = options.dashboardPaidOnly ? "&dashboard=1" : "";
+
   try {
-    const res = await fetch(`/api/orders/${orderId}/receipt?download=1`);
+    const res = await fetch(`/api/orders/${orderId}/receipt?download=1${query}`);
     if (!res.ok) {
-      throw new Error(`Receipt download failed with status ${res.status}`);
+      const result = await res.json().catch(() => null);
+      throw new Error(result?.error ?? `Receipt download failed with status ${res.status}`);
     }
 
     const blob = await res.blob();
@@ -27,9 +33,11 @@ export async function downloadReceipt(orderId: string): Promise<boolean> {
     return true;
   } catch (err) {
     console.error("Receipt download failed, using fallback:", err);
+    if (options.dashboardPaidOnly) return false;
+
     // Fallback: If blob download fails for any reason
     const fallbackLink = document.createElement("a");
-    fallbackLink.href = `/api/orders/${orderId}/receipt?download=1`;
+    fallbackLink.href = `/api/orders/${orderId}/receipt?download=1${query}`;
     fallbackLink.download = `Receipt-${orderId}.pdf`;
     fallbackLink.target = "_blank";
     fallbackLink.rel = "noopener noreferrer";

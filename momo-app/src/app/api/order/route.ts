@@ -4,6 +4,7 @@ import Order from "@/models/Order";
 import { generateReceiptPDF } from "@/lib/receipt";
 import { sendTelegramDocument, sendTelegramMessage, getOrderKeyboard } from "@/lib/telegram";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { notifyAdminsOfNewOrder } from "@/lib/web-push";
 
 export const dynamic = "force-dynamic";
 
@@ -121,6 +122,16 @@ export async function POST(request: NextRequest) {
     const orderId = newOrder?._id
       ? String(newOrder._id)
       : `ORD-${Date.now().toString().slice(-6)}`;
+
+    try {
+      await notifyAdminsOfNewOrder({
+        id: orderId,
+        total: calculatedTotal,
+        customerName,
+      });
+    } catch (pushErr) {
+      console.error("Could not send admin push notification:", pushErr);
+    }
 
     const dateFormatted = new Date().toISOString().split("T")[0];
     const totalAmount = Number(total);

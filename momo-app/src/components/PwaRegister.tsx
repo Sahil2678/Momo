@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Download, X } from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
@@ -9,9 +10,13 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export function PwaRegister() {
+  const pathname = usePathname();
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installPromptSurface, setInstallPromptSurface] = useState<"storefront" | "dashboard" | null>(null);
   const [showBanner, setShowBanner] = useState(false);
   const [installDialogStep, setInstallDialogStep] = useState<"confirm" | "instructions" | null>(null);
+  const isDashboardInstall = pathname.startsWith("/dashboard") && !pathname.startsWith("/dashboard/login");
+  const isDashboardLogin = pathname.startsWith("/dashboard/login");
 
   useEffect(() => {
     const isInstalled =
@@ -51,13 +56,20 @@ export function PwaRegister() {
     const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
       if (isInstalled) return;
+      const currentPath = window.location.pathname;
+      if (currentPath.startsWith("/dashboard/login")) return;
+
       setInstallPrompt(e as BeforeInstallPromptEvent);
+      setInstallPromptSurface(
+        currentPath.startsWith("/dashboard") ? "dashboard" : "storefront"
+      );
       setShowBanner(true);
     };
 
     const handleAppInstalled = () => {
       localStorage.removeItem("pwa_install_pending");
       setInstallPrompt(null);
+      setInstallPromptSurface(null);
       setShowBanner(false);
       setInstallDialogStep(null);
     };
@@ -72,7 +84,8 @@ export function PwaRegister() {
   }, []);
 
   const handleInstallClick = async () => {
-    if (!installPrompt) {
+    const currentSurface = isDashboardInstall ? "dashboard" : "storefront";
+    if (!installPrompt || installPromptSurface !== currentSurface) {
       setInstallDialogStep("confirm");
       return;
     }
@@ -96,7 +109,8 @@ export function PwaRegister() {
   };
 
   const handleConfirmInstall = async () => {
-    if (!installPrompt) {
+    const currentSurface = isDashboardInstall ? "dashboard" : "storefront";
+    if (!installPrompt || installPromptSurface !== currentSurface) {
       setInstallDialogStep("instructions");
       return;
     }
@@ -112,7 +126,7 @@ export function PwaRegister() {
     setShowBanner(false);
   };
 
-  if (!showBanner) return null;
+  if (!showBanner || isDashboardLogin) return null;
 
   return (
     <>
@@ -123,8 +137,14 @@ export function PwaRegister() {
               🥟
             </div>
             <div>
-              <h4 className="text-xs font-bold text-white">Install RK MOMO App</h4>
-              <p className="text-[11px] text-zinc-400">Order faster directly from your home screen!</p>
+              <h4 className="text-xs font-bold text-white">
+                {isDashboardInstall ? "Install RK MOMO Dashboard" : "Install RK MOMO App"}
+              </h4>
+              <p className="text-[11px] text-zinc-400">
+                {isDashboardInstall
+                  ? "Manage orders faster from your home screen."
+                  : "Order faster directly from your home screen!"}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -161,7 +181,9 @@ export function PwaRegister() {
           >
             <div className="mb-3 flex items-center justify-between">
               <h2 id="pwa-install-dialog-title" className="text-base font-bold">
-                {installDialogStep === "confirm" ? "Install RK MOMO?" : "Install RK MOMO"}
+                {installDialogStep === "confirm"
+                  ? `Install ${isDashboardInstall ? "RK MOMO Dashboard" : "RK MOMO"}?`
+                  : `Install ${isDashboardInstall ? "RK MOMO Dashboard" : "RK MOMO"}`}
               </h2>
               <button
                 onClick={closeInstallDialog}
@@ -174,7 +196,9 @@ export function PwaRegister() {
             {installDialogStep === "confirm" ? (
               <>
                 <p className="text-sm leading-relaxed text-zinc-300">
-                  RK MOMO app install karna chahte hain?
+                  {isDashboardInstall
+                    ? "RK MOMO dashboard app install karna chahte hain?"
+                    : "RK MOMO app install karna chahte hain?"}
                 </p>
                 <div className="mt-5 flex justify-end gap-3">
                   <button

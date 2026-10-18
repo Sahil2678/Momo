@@ -1,0 +1,25 @@
+{
+  "id": "/dashboard",
+  "name": "RK MOMO Admin",
+  "short_name": "MOMO Admin",
+  "description": "RK MOMO Admin Dashboard",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0e0a08",
+  "theme_color": "#0e0a08",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -12,21 +12,28 @@
     "@types/pdfkit": "^0.17.6",
     "lucide-react": "^1.55.0",
     "mongoose": "^9.11.1",
-    "next": "15.3.9",
+    "next": "15.5.28",
     "pdfkit": "^0.20.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "sharp": "^0.33.5"
+    "sharp": "^0.35.5",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "eslint": "^9",
-    "eslint-config-next": "15.3.9",
-    "postcss": "^8",
+    "eslint-config-next": "15.5.28",
+    "postcss": "^8.5.30",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "^8.5.30"
+    }
   }
 }

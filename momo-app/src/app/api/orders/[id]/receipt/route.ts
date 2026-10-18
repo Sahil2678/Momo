@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import Order from "@/models/Order";
 import { generateReceiptPDF } from "@/lib/receipt";
+import { verifyAdminSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,14 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params;
+    const isDashboardReceipt = request.nextUrl.searchParams.get("dashboard") === "1";
+
+    if (isDashboardReceipt && !(await verifyAdminSession(request))) {
+      return NextResponse.json(
+        { success: false, error: "Admin session required for paid dashboard receipts." },
+        { status: 401 }
+      );
+    }
 
     await connectToDatabase();
     const order = await Order.findById(id);
@@ -19,6 +28,13 @@ export async function GET(
       return NextResponse.json(
         { success: false, error: "Order not found" },
         { status: 404 }
+      );
+    }
+
+    if (isDashboardReceipt && order.paymentStatus !== "Paid") {
+      return NextResponse.json(
+        { success: false, error: "A receipt is available in the dashboard only after payment is marked Paid." },
+        { status: 409 }
       );
     }
 
@@ -41,7 +57,7 @@ export async function GET(
       subtotal: Number(order.subtotal),
       deliveryFee: Number(order.deliveryFee || 0),
       total: Number(order.total),
-      paymentStatus: order.paymentStatus || "Pending",
+      paymentStatus: isDashboardReceipt ? "Paid" : order.paymentStatus || "Pending",
     });
 
     const isDownload = request.nextUrl.searchParams.get("download") === "1";
@@ -52,7 +68,7 @@ export async function GET(
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `${disposition}; filename="Receipt-${id}.pdf"`,
-        "Cache-Control": "public, max-age=3600, s-maxage=3600",
+        "Cache-Control": isDashboardReceipt ? "private, no-store" : "public, max-age=3600, s-maxage=3600",
       },
     });
   } catch (error: unknown) {

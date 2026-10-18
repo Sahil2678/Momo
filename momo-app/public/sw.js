@@ -38,6 +38,74 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+self.addEventListener("push", (event) => {
+  event.waitUntil(
+    (async () => {
+      let payload = {};
+      try {
+        payload = event.data ? event.data.json() : {};
+      } catch (error) {
+        console.error("Invalid push notification payload:", error);
+      }
+
+      const data = payload && typeof payload === "object" ? payload : {};
+      const title = typeof data.title === "string" ? data.title : "RK MOMO";
+      const options = {
+        body: typeof data.body === "string" ? data.body : "A new order has been received.",
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
+        tag: typeof data.tag === "string" ? data.tag : "rkmomo-new-order",
+        data: { url: typeof data.url === "string" ? data.url : "/dashboard" },
+        requireInteraction: true,
+      };
+
+      const dashboardClients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const dashboardIsVisible = dashboardClients.some((client) => {
+        try {
+          return new URL(client.url).pathname.startsWith("/dashboard") && client.visibilityState === "visible";
+        } catch (error) {
+          console.warn("Could not inspect notification client URL:", error);
+          return false;
+        }
+      });
+
+      if (!dashboardIsVisible) {
+        await self.registration.showNotification(title, options);
+      }
+    })()
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = new URL(
+    event.notification.data && typeof event.notification.data.url === "string"
+      ? event.notification.data.url
+      : "/dashboard",
+    self.location.origin
+  ).href;
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (clients) => {
+      const dashboardClient = clients.find((client) => {
+        try {
+          return new URL(client.url).pathname.startsWith("/dashboard");
+        } catch (error) {
+          console.warn("Could not inspect notification client URL:", error);
+          return false;
+        }
+      });
+
+      if (dashboardClient) {
+        await dashboardClient.navigate(targetUrl);
+        return dashboardClient.focus();
+      }
+
+      return self.clients.openWindow(targetUrl);
+    })
+  );
+});
+
 // Intelligent fetch caching strategy for high-performance PWA
 self.addEventListener("fetch", (event) => {
   const { request } = event;

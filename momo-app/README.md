@@ -26,6 +26,12 @@ The order API reads `TELEGRAM_TOKEN` and `TELEGRAM_CHAT_ID` on the server. Add b
 
 If an order still does not appear, check the Vercel function logs for the order API request; Telegram API errors are logged there. If the receipt PDF cannot be sent, the API attempts to send the order details as a text message instead.
 
+## Background admin order notifications
+
+The admin dashboard uses Web Push so subscribed devices can receive new-order notifications while the dashboard is closed. The server requires `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`; these are configured in the ignored local `.env.local` for development. Add the same VAPID key pair to the hosting provider's server-side environment variables and set `VAPID_SUBJECT` to a valid `mailto:` contact or the production site URL, then redeploy. Never expose the private key with a `NEXT_PUBLIC_` prefix or commit it.
+
+On each admin device, open the deployed dashboard, go to **Orders**, select **Enable Order Notifications**, and allow browser notifications. Keep notifications enabled in the device/browser settings. The service worker displays background notifications and opens the dashboard when tapped. Notification sounds are controlled by the operating system/browser; the web app cannot force a custom sound. Background delivery requires a supported browser, HTTPS, and an internet connection.
+
 ## Secure Telegram webhook
 
 The Telegram webhook rejects requests unless these server-side Vercel Production environment variables are configured:
