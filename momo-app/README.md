@@ -34,7 +34,15 @@ The Telegram webhook rejects requests unless these server-side Vercel Production
 - `TELEGRAM_ADMIN_IDS`: comma-separated numeric Telegram user IDs allowed to update orders.
 - `TELEGRAM_CHAT_ID`: the Telegram chat where order notifications and admin actions are expected.
 
-After adding the variables, redeploy and register/update the webhook with Telegram's `secret_token` set to the same `TELEGRAM_WEBHOOK_SECRET`. The webhook URL is `https://<production-domain>/api/telegram-webhook`. Do not put the bot token or webhook secret in source code or share them.
+After adding the variables, redeploy and register/update the webhook with Telegram's `secret_token` set to exactly the same `TELEGRAM_WEBHOOK_SECRET`. A webhook registered with only the URL will be rejected, and the inline buttons will not work. For example:
+
+```bash
+curl -X POST "https://api.telegram.org/bot<TELEGRAM_TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://<production-domain>/api/telegram-webhook","secret_token":"<same TELEGRAM_WEBHOOK_SECRET value>"}'
+```
+
+Set the URL to your stable production domain. Also make sure `TELEGRAM_ADMIN_IDS` contains the numeric Telegram user ID of the person pressing the buttons, and `TELEGRAM_CHAT_ID` matches the chat receiving the order notifications. Re-register the webhook only when its URL or secret changes. Do not put the bot token or webhook secret in source code or share them.
 
 ## Learn More
 

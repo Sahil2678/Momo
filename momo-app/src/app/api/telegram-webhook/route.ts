@@ -68,13 +68,21 @@ export async function POST(request: NextRequest) {
     const update = await request.json();
     const senderId = update.callback_query?.from?.id ?? update.message?.from?.id;
     const updateChatId = update.callback_query?.message?.chat?.id ?? update.message?.chat?.id;
+    const isAuthorized =
+      senderId !== undefined &&
+      adminIds.includes(String(senderId)) &&
+      updateChatId !== undefined &&
+      String(updateChatId) === telegramChatId;
 
-    if (
-      senderId === undefined ||
-      !adminIds.includes(String(senderId)) ||
-      updateChatId === undefined ||
-      String(updateChatId) !== telegramChatId
-    ) {
+    if (update.callback_query) {
+      await answerTelegramCallbackQuery(
+        telegramToken,
+        update.callback_query.id,
+        isAuthorized ? undefined : "Not authorized to update orders."
+      );
+    }
+
+    if (!isAuthorized) {
       return NextResponse.json({ ok: true, ignored: true });
     }
 
@@ -83,7 +91,6 @@ export async function POST(request: NextRequest) {
     // =========================================================================
     if (update.callback_query) {
       const callbackQuery = update.callback_query;
-      const callbackId = callbackQuery.id;
       const data = callbackQuery.data || "";
       const message = callbackQuery.message;
       const chatId = message?.chat?.id;
@@ -96,9 +103,6 @@ export async function POST(request: NextRequest) {
         const parts = data.split("_");
         const action = parts[1]; // paid, sched, part, pend
         const orderId = parts.slice(2).join("_"); // handles IDs that might have underscores
-
-        // Acknowledge callback immediately to dismiss Telegram button spinner
-        await answerTelegramCallbackQuery(telegramToken, callbackId);
 
         // CASE B: "Part Paid" Button Click -> Trigger force_reply prompt
         if (action === "part") {
@@ -259,8 +263,6 @@ export async function POST(request: NextRequest) {
         const parts = data.split("_");
         const orderId = parts[1];
         const dateText = parts.slice(2).join("_");
-
-        await answerTelegramCallbackQuery(telegramToken, callbackId);
 
         if (!orderId.match(/^[0-9a-fA-F]{24}$/)) {
           return NextResponse.json({ ok: false, error: "Invalid order ID" }, { status: 404 });
