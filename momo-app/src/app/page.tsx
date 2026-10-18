@@ -55,7 +55,7 @@ function TypewriterText() {
   }, [currentText, isDeleting, currentWordIndex]);
 
   return (
-    <span className="relative inline-flex items-center text-yellow-600 min-w-[200px] sm:min-w-[360px]">
+    <span className="relative inline-flex items-center text-yellow-400 min-w-[200px] sm:min-w-[360px]">
       <span>{currentText || "\u00A0"}</span>
       <span className="ml-1 inline-block h-[1em] w-[3px] bg-amber-400 animate-[pulse_0.8s_infinite]"></span>
     </span>
