@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 import { generateFontStyles, normalizeSpecialFont } from "@/lib/font-styles";
+import { downloadReceipt } from "@/lib/download-receipt";
 
 export function CartDrawer() {
   const {
@@ -58,6 +59,8 @@ export function CartDrawer() {
     };
   } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isDownloadingReceipt, setIsDownloadingReceipt] = useState(false);
+  const [receiptDownloaded, setReceiptDownloaded] = useState(false);
   // Local string values for quantity inputs — allows clearing before typing a new number
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
 
@@ -153,13 +156,13 @@ export function CartDrawer() {
     <div className="fixed inset-0 z-50 overflow-hidden">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/75 backdrop-blur-md transition-opacity duration-300 animate-in fade-in"
+        className="fixed inset-0 bg-black/80 transition-opacity duration-200"
         onClick={closeCart}
       />
 
       {/* Drawer panel */}
       <div className="fixed inset-y-0 right-0 flex max-w-full pl-6">
-        <div className="w-screen max-w-md transform border-l border-white/10 bg-zinc-950/95 text-white shadow-2xl backdrop-blur-2xl transition-all duration-300 sm:max-w-lg">
+        <div className="w-screen max-w-md transform border-l border-white/10 bg-[#0c0c10] text-white shadow-2xl transition-transform duration-200 sm:max-w-lg">
           <div className="flex h-full flex-col">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
@@ -239,15 +242,38 @@ export function CartDrawer() {
                 </div>
 
                 {orderSuccess.orderId && (
-                  <a
-                    href={`/api/orders/${orderSuccess.orderId}/receipt?download=1`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/[0.06] py-2.5 text-xs font-semibold text-zinc-200 transition hover:bg-white/10 hover:text-white"
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!orderSuccess.orderId || isDownloadingReceipt) return;
+                      setIsDownloadingReceipt(true);
+                      const ok = await downloadReceipt(orderSuccess.orderId);
+                      setIsDownloadingReceipt(false);
+                      if (ok) {
+                        setReceiptDownloaded(true);
+                        setTimeout(() => setReceiptDownloaded(false), 3000);
+                      }
+                    }}
+                    disabled={isDownloadingReceipt}
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/[0.06] py-2.5 text-xs font-semibold text-zinc-200 transition hover:bg-white/10 hover:text-white active:scale-95 disabled:opacity-50"
                   >
-                    <FileText className="h-4 w-4 text-amber-400" />
-                    Download PDF Receipt
-                  </a>
+                    {isDownloadingReceipt ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin text-amber-400" />
+                        Downloading Receipt...
+                      </>
+                    ) : receiptDownloaded ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                        Receipt Downloaded!
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-4 w-4 text-amber-400" />
+                        Download PDF Receipt
+                      </>
+                    )}
+                  </button>
                 )}
 
                 <button

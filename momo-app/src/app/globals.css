@@ -30,6 +30,8 @@ body {
   font-family: Arial, Helvetica, sans-serif;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 /* Hide scrollbar for Chrome, Safari, Edge and Firefox */

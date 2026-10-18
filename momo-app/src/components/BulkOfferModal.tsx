@@ -119,16 +119,14 @@ export function BulkOfferModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      {/* Backdrop with rich blur */}
+      {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/85 backdrop-blur-md transition-opacity duration-300 animate-in fade-in"
+        className="fixed inset-0 bg-black/85 transition-opacity duration-200"
         onClick={handleClose}
       />
 
       {/* Modal Container */}
-      <div className="relative w-full max-w-2xl my-auto overflow-hidden rounded-3xl border border-amber-500/40 bg-zinc-950/95 shadow-[0_0_60px_rgba(245,158,11,0.25)] text-white backdrop-blur-2xl transition-all duration-300 animate-in zoom-in-95">
-        {/* Ambient Top Glow */}
-        <div className="absolute -top-20 left-1/2 -translate-x-1/2 h-44 w-96 rounded-full bg-gradient-to-r from-amber-500/30 via-orange-500/30 to-rose-500/20 blur-[90px] pointer-events-none" />
+      <div className="relative w-full max-w-2xl my-auto overflow-hidden rounded-3xl border border-amber-500/40 bg-[#0e0e12] shadow-2xl text-white transition-all duration-200">
 
         {/* Close Button */}
         <button

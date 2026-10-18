@@ -55,7 +55,7 @@ export default function MomoHomePage() {
       </div>
 
       {/* Floating Modern Header */}
-      <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#070709]/10 backdrop-blur-xl transition-all">
+      <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#070709]/95 backdrop-blur-md transition-all">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-3.5 py-2.5 sm:px-6 sm:py-3.5 lg:px-8">
           {/* Brand Logo */}
           <div className="flex items-center gap-2.5 sm:gap-3">
@@ -211,12 +211,12 @@ export default function MomoHomePage() {
           </div>
 
           {/* Category Filter Pills (Horizontal on mobile) */}
-          <div className="flex w-full md:w-auto items-center gap-2 overflow-x-auto no-scrollbar py-1 px-1 -mx-4 px-4 sm:mx-0 sm:px-1.5 sm:flex-wrap rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl">
+          <div className="flex w-full md:w-auto items-center gap-2 overflow-x-auto no-scrollbar py-1 px-1 -mx-4 px-4 sm:mx-0 sm:px-1.5 sm:flex-wrap rounded-2xl border border-white/10 bg-[#101014]">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`shrink-0 rounded-xl px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs font-semibold whitespace-nowrap transition-all duration-300 ${
+                className={`shrink-0 rounded-xl px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs font-semibold whitespace-nowrap transition-colors duration-200 ${
                   selectedCategory === cat
                     ? "bg-amber-500 text-zinc-950 shadow-md"
                     : "text-zinc-400 hover:text-white hover:bg-white/5"
@@ -240,7 +240,7 @@ export default function MomoHomePage() {
             <p className="text-sm">No momos in this category yet.</p>
           </div>
         ) : (
-          <div className="flex overflow-x-auto snap-x snap-mandatory gap-5 pt-6 -mx-4 px-4 no-scrollbar sm:mx-0 sm:px-0 sm:grid sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 pt-4 -mx-4 px-4 no-scrollbar overscroll-x-contain sm:mx-0 sm:px-0 sm:grid sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {filteredMomos.map((momo) => (
               <MomoCard key={momo.id} momo={momo} />
             ))}

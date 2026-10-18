@@ -30,6 +30,7 @@ import {
   Menu,
 } from "lucide-react";
 import { normalizeSpecialFont } from "@/lib/font-styles";
+import { downloadReceipt } from "@/lib/download-receipt";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1424,16 +1425,15 @@ export default function DashboardPage() {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <a
-                          href={`/api/orders/${order._id}/receipt?download=1`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-bold text-zinc-300 hover:bg-white/[0.08] hover:text-white transition-all"
+                        <button
+                          type="button"
+                          onClick={() => downloadReceipt(order._id)}
+                          className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-bold text-zinc-300 hover:bg-white/[0.08] hover:text-white transition-all active:scale-95"
                           title="Download PDF Receipt"
                         >
                           <FileText className="h-3.5 w-3.5 text-amber-400" />
                           Receipt
-                        </a>
+                        </button>
 
                         {/* Delete button (Only for Cancelled orders) */}
                         {order.status === "cancelled" && (
