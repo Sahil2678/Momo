@@ -30,7 +30,7 @@ export function MomoCard({ momo }: MomoCardProps) {
   }[momo.spiceLevel || "Medium"];
 
   return (
-    <div className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-white/[0.08] bg-[#101014] p-3.5 sm:p-5 sm:transition-all sm:duration-300 sm:hover:-translate-y-1 hover:border-amber-500/40 hover:shadow-[0_15px_30px_-10px_rgba(245,158,11,0.15)] w-[82vw] max-w-[310px] shrink-0 snap-center sm:w-auto sm:max-w-none transform-gpu">
+    <div className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-white/[0.08] bg-[#101014] md:bg-gradient-to-b md:from-white/[0.07] md:to-white/[0.02] md:backdrop-blur-xl p-3.5 sm:p-5 sm:transition-all sm:duration-300 sm:hover:-translate-y-1 hover:border-amber-500/40 hover:shadow-[0_15px_30px_-10px_rgba(245,158,11,0.15)] w-[82vw] max-w-[310px] shrink-0 snap-center sm:w-auto sm:max-w-none transform-gpu">
       {/* Top Media Container */}
       <div className="relative mb-3 sm:mb-4 h-44 sm:h-56 w-full overflow-hidden rounded-2xl bg-zinc-900">
         <Image
@@ -46,22 +46,22 @@ export function MomoCard({ momo }: MomoCardProps) {
         {/* Badges Overlay */}
         <div className="absolute left-3 top-3 flex flex-wrap gap-2">
           {momo.badge && (
-            <span className="rounded-full bg-amber-500 px-3 py-1 text-xs font-bold text-zinc-950 shadow-md">
+            <span className="rounded-full bg-amber-500 md:bg-amber-500/90 md:backdrop-blur-md px-3 py-1 text-xs font-bold text-zinc-950 shadow-md">
               {momo.badge}
             </span>
           )}
           {momo.spiceLevel && (
-            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold border ${spiceBadgeColor} bg-zinc-950/80`}>
+            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold border ${spiceBadgeColor} bg-zinc-950/80 md:backdrop-blur-md`}>
               {momo.spiceLevel}
             </span>
           )}
         </div>
 
         <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs text-zinc-300">
-          <span className="rounded-lg bg-black/80 px-2.5 py-1 font-medium text-zinc-200">
+          <span className="rounded-lg bg-black/80 md:backdrop-blur-md px-2.5 py-1 font-medium text-zinc-200">
             {momo.pieces} Pcs / Pack
           </span>
-          <span className="rounded-lg bg-black/80 px-2.5 py-1 font-semibold text-emerald-300">
+          <span className="rounded-lg bg-black/80 md:backdrop-blur-md px-2.5 py-1 font-semibold text-emerald-300">
             ₹{wholesaleRate}/pc (500+)
           </span>
         </div>

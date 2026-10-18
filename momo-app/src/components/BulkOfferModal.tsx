@@ -121,12 +121,14 @@ export function BulkOfferModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/85 transition-opacity duration-200"
+        className="fixed inset-0 bg-black/85 md:backdrop-blur-md transition-opacity duration-200"
         onClick={handleClose}
       />
 
       {/* Modal Container */}
-      <div className="relative w-full max-w-2xl my-auto overflow-hidden rounded-3xl border border-amber-500/40 bg-[#0e0e12] shadow-2xl text-white transition-all duration-200">
+      <div className="relative w-full max-w-2xl my-auto overflow-hidden rounded-3xl border border-amber-500/40 bg-[#0e0e12] md:bg-zinc-950/90 md:backdrop-blur-2xl shadow-2xl text-white transition-all duration-200">
+        {/* Ambient Top Glow (Desktop/Laptop only) */}
+        <div className="hidden md:block absolute -top-20 left-1/2 -translate-x-1/2 h-44 w-96 rounded-full bg-gradient-to-r from-amber-500/30 via-orange-500/30 to-rose-500/20 blur-[90px] pointer-events-none" />
 
         {/* Close Button */}
         <button

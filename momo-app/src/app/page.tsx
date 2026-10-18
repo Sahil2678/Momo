@@ -55,7 +55,7 @@ export default function MomoHomePage() {
       </div>
 
       {/* Floating Modern Header */}
-      <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#070709]/95 backdrop-blur-md transition-all">
+      <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#070709]/95 md:bg-[#070709]/60 md:backdrop-blur-xl transition-all">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-3.5 py-2.5 sm:px-6 sm:py-3.5 lg:px-8">
           {/* Brand Logo */}
           <div className="flex items-center gap-2.5 sm:gap-3">

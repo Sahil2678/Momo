@@ -156,13 +156,13 @@ export function CartDrawer() {
     <div className="fixed inset-0 z-50 overflow-hidden">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/80 transition-opacity duration-200"
+        className="fixed inset-0 bg-black/80 md:backdrop-blur-sm transition-opacity duration-200"
         onClick={closeCart}
       />
 
       {/* Drawer panel */}
       <div className="fixed inset-y-0 right-0 flex max-w-full pl-6">
-        <div className="w-screen max-w-md transform border-l border-white/10 bg-[#0c0c10] text-white shadow-2xl transition-transform duration-200 sm:max-w-lg">
+        <div className="w-screen max-w-md transform border-l border-white/10 bg-[#0c0c10] md:bg-zinc-950/95 md:backdrop-blur-2xl text-white shadow-2xl transition-transform duration-200 sm:max-w-lg">
           <div className="flex h-full flex-col">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
