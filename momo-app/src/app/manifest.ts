@@ -1,9 +1,8 @@
 import type { MetadataRoute } from "next";
-import { SplashScreen } from "@/components/SplashScreen";
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "",
-    short_name: "",
+    name: "RK MOMO",
+    short_name: "RK MOMO",
     description: "Fresh RK MOMO Wholesale & Retail Ordering Platform",
     start_url: "/",
     display: "standalone",

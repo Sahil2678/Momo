@@ -13,11 +13,26 @@ export function PwaRegister() {
   const [showBanner, setShowBanner] = useState(false);
 
   useEffect(() => {
-    // 1. Register Service Worker
+    // 1. Register Service Worker with Auto-Update Detection
     if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
       navigator.serviceWorker
         .register("/sw.js")
-        .then((reg) => console.log("PWA Service Worker registered:", reg.scope))
+        .then((reg) => {
+          console.log("PWA Service Worker registered:", reg.scope);
+
+          // Auto-check for new updates on every page view
+          reg.onupdatefound = () => {
+            const installingWorker = reg.installing;
+            if (installingWorker) {
+              installingWorker.onstatechange = () => {
+                if (installingWorker.state === "installed" && navigator.serviceWorker.controller) {
+                  // Silent reload to activate updated React code/styles automatically
+                  window.location.reload();
+                }
+              };
+            }
+          };
+        })
         .catch((err) => console.warn("PWA Service Worker registration failed:", err));
     }
 
