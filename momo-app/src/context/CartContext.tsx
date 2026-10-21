@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { MomoItem, getWholesalePriceForItem } from "@/types/momo";
 
 export interface CartItem {
@@ -63,8 +63,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [cart, isCartLoaded]);
 
-  const openCart = () => setIsOpen(true);
-  const closeCart = () => setIsOpen(false);
+  const openCart = useCallback(() => setIsOpen(true), []);
+  const closeCart = useCallback(() => setIsOpen(false), []);
 
   const addToCart = (item: MomoItem, variant: string = "Standard Portion") => {
     setCart((prev) => {

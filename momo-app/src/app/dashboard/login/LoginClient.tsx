@@ -48,7 +48,7 @@ function LoginForm() {
         }
       }
 
-      router.push(safePath);
+      router.replace(safePath);
       router.refresh();
     } catch {
       setError("Network error. Please check your connection.");

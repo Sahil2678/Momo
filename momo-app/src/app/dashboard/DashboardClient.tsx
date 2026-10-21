@@ -344,6 +344,7 @@ function MomoFormModal({
                 type="number"
                 className={inputCls}
                 min={1}
+                step={0.01}
                 value={form.price}
                 onChange={(e) => set("price", Number(e.target.value))}
                 required

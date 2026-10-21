@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 import { getWholesalePriceForItem } from "@/types/momo";
@@ -63,6 +63,35 @@ export function CartDrawer() {
   const [receiptDownloaded, setReceiptDownloaded] = useState(false);
   // Local string values for quantity inputs — allows clearing before typing a new number
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const marker = `${Date.now()}-${Math.random()}`;
+    const currentState = window.history.state;
+    const state =
+      currentState && typeof currentState === "object" ? currentState : {};
+
+    window.history.pushState({ ...state, __momoCartDrawer: marker }, "");
+
+    let historyEntryPopped = false;
+    const handlePopState = () => {
+      historyEntryPopped = true;
+      closeCart();
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+
+      if (
+        !historyEntryPopped &&
+        window.history.state?.__momoCartDrawer === marker
+      ) {
+        window.history.back();
+      }
+    };
+  }, [isOpen, closeCart]);
 
   // When new items are added to the cart, automatically clear any previous orderSuccess
   // so the user immediately sees their cart instead of having to manually click "Order More Momos"
