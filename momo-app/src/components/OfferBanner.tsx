@@ -21,7 +21,7 @@ export function OfferBanner({ onOpenOffer }: OfferBannerProps) {
             <span className="font-extrabold text-white bg-black/20 px-1 py-0.5 rounded underline decoration-amber-300">₹2.75</span>
             <span className="mx-1 text-amber-200/90 font-light">|</span>
             <span>Paneer </span>
-            <span className="font-extrabold text-white bg-black/20 px-1 py-0.5 rounded underline decoration-amber-300">₹3.75</span>
+            <span className="font-extrabold text-white bg-black/20 px-1 py-0.5 rounded underline decoration-amber-300">₹4</span>
             <span className="text-amber-100 ml-0.5">/pc</span>
             <span className="inline-block text-amber-200 font-semibold ml-1.5 whitespace-nowrap bg-black/20 px-1.5 py-0.5 rounded text-[10px] min-[370px]:text-[11px] sm:text-lg">
               (Min 500 pcs)

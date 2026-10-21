@@ -7,6 +7,7 @@ import {
   sendTelegramMessage,
   getOrderKeyboard,
 } from "@/lib/telegram";
+import { verifyAdminSession } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
 import Order from "@/models/Order";
 
@@ -47,7 +48,54 @@ function getStatusMapping(action: string): { label: string; paymentStatus: strin
   }
 }
 
+async function registerTelegramWebhook(request: NextRequest) {
+  const telegramToken = process.env.TELEGRAM_TOKEN;
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+
+  if (!telegramToken || !webhookSecret) {
+    return NextResponse.json(
+      { ok: false, error: "Telegram bot token and webhook secret must be configured." },
+      { status: 503 }
+    );
+  }
+
+  const targetWebhookUrl = `${request.nextUrl.origin}/api/telegram-webhook`;
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${telegramToken}/setWebhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: targetWebhookUrl,
+        secret_token: webhookSecret,
+        allowed_updates: ["message", "callback_query"],
+        drop_pending_updates: false,
+      }),
+    });
+    const data = await res.json();
+
+    return NextResponse.json({
+      ok: data.ok,
+      message: data.ok ? "Telegram webhook successfully registered." : "Telegram rejected the webhook registration.",
+      targetWebhookUrl,
+    }, { status: data.ok ? 200 : 502 });
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "Failed to register the Telegram webhook." },
+      { status: 502 }
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  if (searchParams.get("setup") === "1" || searchParams.get("register") === "1") {
+    if (!(await verifyAdminSession(request))) {
+      return NextResponse.json({ ok: false, error: "Unauthorized access" }, { status: 401 });
+    }
+    return registerTelegramWebhook(request);
+  }
+
   const telegramToken = process.env.TELEGRAM_TOKEN;
   const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
   const telegramChatId = process.env.TELEGRAM_CHAT_ID;
@@ -57,17 +105,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Bot token not configured" }, { status: 500 });
   }
 
-  // Verify secret token if present in request headers
-  const providedSecret = request.headers.get("x-telegram-bot-api-secret-token");
-  if (webhookSecret && providedSecret) {
-    if (!isValidSecretToken(providedSecret, webhookSecret)) {
-      console.warn("Telegram webhook secret mismatch");
-      return NextResponse.json({ ok: false, error: "Unauthorized webhook request" }, { status: 401 });
-    }
-  } else if (webhookSecret && !providedSecret) {
-    console.info(
-      "Telegram webhook received update without x-telegram-bot-api-secret-token header. Visit /api/telegram-webhook?setup=1 to sync."
+  if (!webhookSecret) {
+    return NextResponse.json(
+      { ok: false, error: "Telegram webhook secret is not configured." },
+      { status: 503 }
     );
+  }
+
+  const providedSecret = request.headers.get("x-telegram-bot-api-secret-token");
+  if (!isValidSecretToken(providedSecret, webhookSecret)) {
+    console.warn("Telegram webhook secret mismatch");
+    return NextResponse.json({ ok: false, error: "Unauthorized webhook request" }, { status: 401 });
   }
 
   try {
@@ -95,7 +143,7 @@ export async function POST(request: NextRequest) {
     // OR if neither is configured (fallback to bot token authenticity).
     const matchesChat = Boolean(telegramChatId && updateChatId !== undefined && String(updateChatId) === String(telegramChatId));
     const matchesAdmin = Boolean(adminIds.length && senderId !== undefined && adminIds.includes(String(senderId)));
-    const isAuthorized = matchesChat || matchesAdmin || (!telegramChatId && adminIds.length === 0);
+    const isAuthorized = matchesChat || matchesAdmin;
 
     // If unauthorized, answer callback query with popup and ignore
     if (!isAuthorized) {
@@ -486,6 +534,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  if (!(await verifyAdminSession(request))) {
+    return NextResponse.json({ ok: false, error: "Unauthorized access" }, { status: 401 });
+  }
+
   const telegramToken = process.env.TELEGRAM_TOKEN;
   const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
   const telegramChatId = process.env.TELEGRAM_CHAT_ID;
@@ -497,11 +549,7 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const shouldSetup = searchParams.get("setup") === "1" || searchParams.get("register") === "1";
 
-  // Derive the target webhook URL
-  const origin = request.headers.get("x-forwarded-host")
-    ? `${request.headers.get("x-forwarded-proto") || "https"}://${request.headers.get("x-forwarded-host")}`
-    : request.nextUrl.origin;
-  const targetWebhookUrl = `${origin}/api/telegram-webhook`;
+  const targetWebhookUrl = `${request.nextUrl.origin}/api/telegram-webhook`;
 
   if (!telegramToken) {
     return NextResponse.json(
@@ -515,39 +563,10 @@ export async function GET(request: NextRequest) {
 
   // Auto-setup: register this endpoint with Telegram Bot API
   if (shouldSetup) {
-    try {
-      const setWebhookBody: Record<string, unknown> = {
-        url: targetWebhookUrl,
-        allowed_updates: ["message", "callback_query"],
-        drop_pending_updates: false,
-      };
-
-      if (webhookSecret) {
-        setWebhookBody.secret_token = webhookSecret;
-      }
-
-      const res = await fetch(`https://api.telegram.org/bot${telegramToken}/setWebhook`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(setWebhookBody),
-      });
-
-      const data = await res.json();
-      return NextResponse.json({
-        ok: data.ok,
-        message: data.ok
-          ? "🎉 Telegram webhook successfully registered!"
-          : "⚠️ Telegram rejected the webhook registration.",
-        targetWebhookUrl,
-        hasSecretConfigured: Boolean(webhookSecret),
-        telegramResponse: data,
-      });
-    } catch (err: any) {
-      return NextResponse.json(
-        { ok: false, error: err?.message || "Failed to call Telegram setWebhook API" },
-        { status: 500 }
-      );
-    }
+    return NextResponse.json(
+      { ok: false, error: "Webhook setup requires an authenticated POST request." },
+      { status: 405, headers: { Allow: "POST" } }
+    );
   }
 
   // Diagnostic info
@@ -570,6 +589,6 @@ export async function GET(request: NextRequest) {
       adminIdsCount: adminIds.length,
     },
     telegramWebhookInfo,
-    setupTip: `Visit ${targetWebhookUrl}?setup=1 to automatically sync the webhook with Telegram.`,
+    setupTip: `Send an authenticated POST request to ${targetWebhookUrl}?setup=1 while signed in as admin.`,
   });
 }

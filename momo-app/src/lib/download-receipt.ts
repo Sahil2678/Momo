@@ -5,12 +5,15 @@
  */
 export async function downloadReceipt(
   orderId: string,
-  options: { dashboardPaidOnly?: boolean } = {}
+  options: { dashboardPaidOnly?: boolean; receiptToken?: string } = {}
 ): Promise<boolean> {
   const query = options.dashboardPaidOnly ? "&dashboard=1" : "";
 
   try {
-    const res = await fetch(`/api/orders/${orderId}/receipt?download=1${query}`);
+    const headers = options.receiptToken
+      ? { "x-receipt-token": options.receiptToken }
+      : undefined;
+    const res = await fetch(`/api/orders/${orderId}/receipt?download=1${query}`, { headers });
     if (!res.ok) {
       const result = await res.json().catch(() => null);
       throw new Error(result?.error ?? `Receipt download failed with status ${res.status}`);
@@ -33,15 +36,6 @@ export async function downloadReceipt(
     return true;
   } catch (err) {
     console.error("Receipt download failed, using fallback:", err);
-    if (options.dashboardPaidOnly) return false;
-
-    // Fallback: If blob download fails for any reason
-    const fallbackLink = document.createElement("a");
-    fallbackLink.href = `/api/orders/${orderId}/receipt?download=1${query}`;
-    fallbackLink.download = `Receipt-${orderId}.pdf`;
-    fallbackLink.target = "_blank";
-    fallbackLink.rel = "noopener noreferrer";
-    fallbackLink.click();
     return false;
   }
 }

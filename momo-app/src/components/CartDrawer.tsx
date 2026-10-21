@@ -52,6 +52,7 @@ export function CartDrawer() {
   const [orderSuccess, setOrderSuccess] = useState<{
     message?: string;
     orderId?: string;
+    receiptToken?: string;
     order?: {
       customer?: { name?: string; ownerName?: string; businessName?: string };
       total?: number;
@@ -276,7 +277,9 @@ export function CartDrawer() {
                     onClick={async () => {
                       if (!orderSuccess.orderId || isDownloadingReceipt) return;
                       setIsDownloadingReceipt(true);
-                      const ok = await downloadReceipt(orderSuccess.orderId);
+                      const ok = await downloadReceipt(orderSuccess.orderId, {
+                        receiptToken: orderSuccess.receiptToken,
+                      });
                       setIsDownloadingReceipt(false);
                       if (ok) {
                         setReceiptDownloaded(true);

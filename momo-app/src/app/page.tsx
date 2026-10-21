@@ -175,7 +175,7 @@ export default function MomoHomePage() {
                     <div className="text-sm sm:text-base font-bold text-white flex flex-wrap items-center gap-x-3 gap-y-1">
                       <span>Veg Momo: <strong className="text-emerald-400">₹2.75/pc</strong></span>
                       <span className="text-zinc-500">•</span>
-                      <span>Paneer Momo: <strong className="text-amber-400">₹3.75/pc</strong></span>
+                      <span>Paneer Momo: <strong className="text-amber-400">₹4/pc</strong></span>
                     </div>
                     <p className="text-[11px] text-zinc-400">
                       Bulk order requirement: 500 pieces minimum per order. Direct kitchen dispatch.

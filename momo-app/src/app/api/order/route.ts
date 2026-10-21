@@ -5,6 +5,7 @@ import { generateReceiptPDF } from "@/lib/receipt";
 import { sendTelegramDocument, sendTelegramMessage, getOrderKeyboard } from "@/lib/telegram";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { notifyAdminsOfNewOrder } from "@/lib/web-push";
+import { createReceiptAccessToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -122,6 +123,7 @@ export async function POST(request: NextRequest) {
     const orderId = newOrder?._id
       ? String(newOrder._id)
       : `ORD-${Date.now().toString().slice(-6)}`;
+    const receiptToken = newOrder?._id ? createReceiptAccessToken(orderId) : undefined;
 
     try {
       await notifyAdminsOfNewOrder({
@@ -230,6 +232,7 @@ export async function POST(request: NextRequest) {
         success: true,
         message: "Order placed successfully! Momo is being freshly prepared.",
         orderId,
+        receiptToken,
         order: newOrder,
       },
       { status: 201 }

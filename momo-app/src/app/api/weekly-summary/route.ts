@@ -9,13 +9,11 @@ export async function GET(request: NextRequest) {
   try {
     // 1. Security check: Verify CRON_SECRET or valid admin session
     const authHeader = request.headers.get("authorization");
-    const { searchParams } = new URL(request.url);
-    const secretParam = searchParams.get("secret");
     const cronSecret = process.env.CRON_SECRET;
 
     const isValidCron = Boolean(
       cronSecret &&
-      ((authHeader && authHeader === `Bearer ${cronSecret}`) || secretParam === cronSecret)
+      authHeader === `Bearer ${cronSecret}`
     );
 
     if (!isValidCron) {
@@ -125,14 +123,14 @@ export async function GET(request: NextRequest) {
       reportDate,
       debtorsCount: pendingOrders.length,
       totalOutstandingMarketCredit,
-      orders: pendingOrders,
+    }, {
+      headers: { "Cache-Control": "private, no-store" },
     });
   } catch (error: unknown) {
     console.error("Weekly summary cron error:", error);
-    const message = error instanceof Error ? error.message : "Failed to run weekly summary cron";
     return NextResponse.json(
-      { success: false, error: message },
-      { status: 500 }
+      { success: false, error: "Failed to run weekly summary." },
+      { status: 500, headers: { "Cache-Control": "private, no-store" } }
     );
   }
 }

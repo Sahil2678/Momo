@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import Order from "@/models/Order";
 import { generateReceiptPDF } from "@/lib/receipt";
-import { verifyAdminSession } from "@/lib/auth";
+import { verifyAdminSession, verifyReceiptAccessToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +18,16 @@ export async function GET(
       return NextResponse.json(
         { success: false, error: "Admin session required for paid dashboard receipts." },
         { status: 401 }
+      );
+    }
+
+    if (
+      !isDashboardReceipt &&
+      !verifyReceiptAccessToken(id, request.headers.get("x-receipt-token") || "")
+    ) {
+      return NextResponse.json(
+        { success: false, error: "A valid receipt access token is required." },
+        { status: 401, headers: { "Cache-Control": "private, no-store" } }
       );
     }
 
@@ -68,7 +78,7 @@ export async function GET(
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `${disposition}; filename="Receipt-${id}.pdf"`,
-        "Cache-Control": isDashboardReceipt ? "private, no-store" : "public, max-age=3600, s-maxage=3600",
+        "Cache-Control": "private, no-store",
       },
     });
   } catch (error: unknown) {
@@ -76,7 +86,7 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to generate receipt",
+        error: "Failed to generate receipt.",
       },
       { status: 500 }
     );

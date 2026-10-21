@@ -1,4 +1,41 @@
 import { NextRequest } from "next/server";
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+const RECEIPT_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+export function createReceiptAccessToken(orderId: string): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new Error("Session signing secret is not configured.");
+
+  const expiresAt = Date.now() + RECEIPT_TOKEN_TTL_MS;
+  const payload = `${orderId}|${expiresAt}`;
+  const signature = createHmac("sha256", secret)
+    .update(`customer-receipt|${payload}`)
+    .digest("hex");
+
+  return `${expiresAt}.${signature}`;
+}
+
+export function verifyReceiptAccessToken(orderId: string, token: string): boolean {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) return false;
+
+  const [expiresAtText, signature] = token.split(".");
+  if (!/^\d{13}$/.test(expiresAtText || "") || !/^[a-f0-9]{64}$/i.test(signature || "")) {
+    return false;
+  }
+
+  const expiresAt = Number(expiresAtText);
+  if (!Number.isSafeInteger(expiresAt) || Date.now() >= expiresAt) return false;
+
+  const payload = `${orderId}|${expiresAt}`;
+  const expected = createHmac("sha256", secret)
+    .update(`customer-receipt|${payload}`)
+    .digest();
+  const provided = Buffer.from(signature, "hex");
+
+  return provided.length === expected.length && timingSafeEqual(provided, expected);
+}
 
 export async function verifyAdminSession(request: NextRequest): Promise<boolean> {
   const token = request.cookies.get("momo_admin_session")?.value;
