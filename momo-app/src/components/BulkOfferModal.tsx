@@ -150,12 +150,12 @@ export function BulkOfferModal({
             <h2 className="mt-3 text-2xl sm:text-4xl font-black tracking-tight text-white leading-tight">
               Bulk Order Dhamaka! <br className="hidden sm:inline" />
               <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 bg-clip-text text-transparent">
-                Veg ₹2.75 & Paneer ₹3.75 / piece
+                Veg ₹2.75 & Paneer ₹4 /per piece
               </span>
             </h2>
 
             <p className="mt-2 text-xs sm:text-sm text-zinc-300 max-w-lg mx-auto">
-              Restaurants, cafes, cloud kitchens aur events ke liye sabse sasta wholesale rate! Fresh Himalayan handcrafted momos direct kitchen se.
+              Restaurants, cafes, cloud kitchens aur events ke liye sabse sasta wholesale rate! Fresh handready momos direct kitchen se.
             </p>
           </div>
 
@@ -163,7 +163,7 @@ export function BulkOfferModal({
           <div className="mt-5 rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-amber-500/10 p-3.5 text-center">
             <div className="flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-amber-300">
               <Layers className="h-4 w-4 text-amber-400 shrink-0" />
-              <span>शर्त / Requirement: Minimum 500 Pieces order zaroori hai</span>
+              <span>Requirement: Minimum 500 Pieces order zaroori hai</span>
             </div>
             <p className="mt-1 text-[11px] text-zinc-400">
               500 pieces ya usse zyada order karne par yeh wholesale rate automatically apply ho jata hai.
@@ -176,11 +176,11 @@ export function BulkOfferModal({
             <div className="relative group overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-b from-emerald-500/[0.08] to-white/[0.02] p-4 transition-all hover:border-emerald-400 hover:shadow-[0_0_25px_rgba(16,185,129,0.15)]">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <span className="inline-block rounded-md bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/30">
+                  {/* <span className="inline-block rounded-md bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/30">
                     VEG SPECIAL
-                  </span>
+                  </span> */}
                   <h3 className="mt-1.5 text-base sm:text-lg font-bold text-white leading-snug">
-                    Himalayan Veg Momo
+                    Fresh Veg Momo
                   </h3>
                 </div>
                 <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-white/10">
@@ -199,7 +199,7 @@ export function BulkOfferModal({
                   <span className="text-xs text-zinc-400">Wholesale Rate:</span>
                   <div className="flex items-baseline gap-1">
                     <span className="text-2xl font-black text-emerald-400">₹2.75</span>
-                    <span className="text-xs text-zinc-400">/ piece</span>
+                    <span className="text-xs text-zinc-400">/per piece</span>
                   </div>
                 </div>
                 <div className="mt-1 flex items-center justify-between text-[11px] text-zinc-400 border-t border-white/5 pt-1.5">
@@ -231,9 +231,9 @@ export function BulkOfferModal({
             <div className="relative group overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/[0.08] to-white/[0.02] p-4 transition-all hover:border-amber-400 hover:shadow-[0_0_25px_rgba(245,158,11,0.15)]">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <span className="inline-block rounded-md bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/30">
+                  {/* <span className="inline-block rounded-md bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/30">
                     MALAI PANEER
-                  </span>
+                  </span> */}
                   <h3 className="mt-1.5 text-base sm:text-lg font-bold text-white leading-snug">
                     Fresh Paneer Momo
                   </h3>
@@ -253,13 +253,13 @@ export function BulkOfferModal({
                 <div className="flex items-baseline justify-between">
                   <span className="text-xs text-zinc-400">Wholesale Rate:</span>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-black text-amber-400">₹3.75</span>
-                    <span className="text-xs text-zinc-400">/ piece</span>
+                    <span className="text-2xl font-black text-amber-400">₹4</span>
+                    <span className="text-xs text-zinc-400">/per piece</span>
                   </div>
                 </div>
                 <div className="mt-1 flex items-center justify-between text-[11px] text-zinc-400 border-t border-white/5 pt-1.5">
                   <span>500 Pcs Total:</span>
-                  <span className="font-bold text-white">₹1,875 Only</span>
+                  <span className="font-bold text-white">₹2,000 Only</span>
                 </div>
               </div>
 
@@ -276,7 +276,7 @@ export function BulkOfferModal({
                 ) : (
                   <>
                     <ShoppingBag className="h-4 w-4" />
-                    <span>Order 500 Paneer Pcs (₹1,875)</span>
+                    <span>Order 500 Paneer Pcs (₹2,000)</span>
                   </>
                 )}
               </button>
